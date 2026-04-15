@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="CasinoApp.API/CasinoApp.API.csproj" />
+  <Project Path="CasinoApp.BusinessLogic/CasinoApp.BusinessLogic.csproj" />
+  <Project Path="CasinoApp.DataAccess/CasinoApp.DataAccess.csproj" />
+  <Project Path="CasinoApp.Web/CasinoApp.Web.Client/CasinoApp.Web.Client.csproj" />
+  <Project Path="CasinoApp.Web/CasinoApp.Web/CasinoApp.Web.csproj" />
+</Solution>
