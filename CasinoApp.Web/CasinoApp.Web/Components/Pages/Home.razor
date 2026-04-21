@@ -1,49 +1,5 @@
-﻿@page "/"
-@rendermode InteractiveServer
-@inject NavigationManager NavManager
-<PageTitle>Login - CasinoApp</PageTitle>
-
-<div class="login-container">
-    <div class="login-box">
-        <h2 class="text-center">🎰 CasinoApp</h2>
-        <hr />
-        
-        <div class="mb-3">
-            <label class="form-label">Utilizator</label>
-            <input type="text" class="form-control" @bind="username" placeholder="Introduceți user-ul..." />
-        </div>
-        
-        <div class="mb-3">
-            <label class="form-label">Parolă</label>
-            <input type="password" class="form-control" @bind="password" placeholder="********" />
-        </div>
-
-        @if (!string.IsNullOrEmpty(errorMessage))
-        {
-            <div class="alert alert-danger">@errorMessage</div>
-        }
-
-        <button class="btn btn-warning w-100 fw-bold" @onclick="HandleLogin">Intră în Cazinou</button>
-    </div>
-</div>
-
+﻿@page "/Home"
+@layout MainLayout
 @code {
-    private string username = "";
-    private string password = "";
-    private string errorMessage = "";
 
-    private void HandleLogin()
-    {
-        // Hardcoded check 
-        Console.WriteLine("Butonul a fost apăsat!");
-        if (username == "admin" && password == "admin1234")
-        {
-            // Dacă e corect, îl trimitem pe pagina principală (o vom crea după)
-            NavManager.NavigateTo("/counter");
-        }
-        else
-        {
-            errorMessage = "Date incorecte! Încearcă admin / admin1234";
-        }
-    }
 }
