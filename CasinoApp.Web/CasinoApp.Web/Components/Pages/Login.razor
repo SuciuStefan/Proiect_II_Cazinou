@@ -1,0 +1,530 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject NavigationManager NavManager
+
+<PageTitle>CasinoApp – Intră în Joc</PageTitle>
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet" />
+
+<div class="casino-bg">
+    <!-- Decorative floating suits -->
+    <div class="suit s1">♠</div>
+    <div class="suit s2">♥</div>
+    <div class="suit s3">♦</div>
+    <div class="suit s4">♣</div>
+    <div class="suit s5">♠</div>
+    <div class="suit s6">♦</div>
+
+    <div class="container @(isSignUp ? "right-panel-active" : "")">
+
+        <!-- SIGN UP FORM -->
+        <div class="form-container sign-up-container">
+            <div class="form-inner">
+                <h1 class="form-title">Cont Nou</h1>
+                <div class="suits-divider">♣ ♦ ♥ ♠</div>
+
+                <div class="field-group">
+                    <label>Nume utilizator</label>
+                    <input type="text" @bind="regUsername" placeholder="ex: LuckyAce99" />
+                </div>
+                <div class="field-group">
+                    <label>Email</label>
+                    <input type="email" @bind="regEmail" placeholder="email@exemplu.com" />
+                </div>
+                <div class="field-group">
+                    <label>Parolă</label>
+                    <input type="password" @bind="regPassword" placeholder="••••••••" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(regMessage))
+                {
+                    <div class="msg-box @(regSuccess ? "msg-ok" : "msg-err")">@regMessage</div>
+                }
+
+                <button class="btn-casino" @onclick="HandleRegister">Înregistrează-te</button>
+            </div>
+        </div>
+
+        <!-- SIGN IN FORM -->
+        <div class="form-container sign-in-container">
+            <div class="form-inner">
+                <h1 class="form-title">Intră în Joc</h1>
+                <div class="suits-divider">♠ ♥ ♦ ♣</div>
+
+                <div class="field-group">
+                    <label>Utilizator</label>
+                    <input type="text" @bind="loginUsername" placeholder="Utilizatorul tău..." />
+                </div>
+                <div class="field-group">
+                    <label>Parolă</label>
+                    <input type="password" @bind="loginPassword" placeholder="••••••••" />
+                </div>
+
+                <a class="forgot-link" href="#">Ai uitat parola?</a>
+
+                @if (!string.IsNullOrEmpty(loginMessage))
+                {
+                    <div class="msg-box @(loginSuccess ? "msg-ok" : "msg-err")">@loginMessage</div>
+                }
+
+                <button class="btn-casino" @onclick="HandleLogin">Intră la Mese</button>
+            </div>
+        </div>
+
+        <!-- SLIDING OVERLAY -->
+        <div class="overlay-container">
+            <div class="overlay">
+
+                <!-- LEFT PANEL (shown when Sign Up is active) -->
+                <div class="overlay-panel overlay-left">
+                    <div class="panel-chip">🎰</div>
+                    <h1>Bine ai revenit!</h1>
+                    <p>Ai deja un cont? Conectează-te și continuă să joci.</p>
+                    <button class="btn-ghost" @onclick="SwitchToLogin">Autentifică-te</button>
+                </div>
+
+                <!-- RIGHT PANEL (shown when Sign In is active) -->
+                <div class="overlay-panel overlay-right">
+                    <div class="panel-chip">🃏</div>
+                    <h1>Noroc bun!</h1>
+                    <p>Creează-ți contul și alătură-te mesei câștigătorilor.</p>
+                    <button class="btn-ghost" @onclick="SwitchToSignUp">Creează Cont</button>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    // Starea panoului: false = Sign In, true = Sign Up
+    private bool isSignUp = false;
+
+    // Câmpuri Sign In
+    private string loginUsername = "";
+    private string loginPassword = "";
+    private string loginMessage = "";
+    private bool loginSuccess = false;
+
+    // Câmpuri Sign Up
+    private string regUsername = "";
+    private string regEmail = "";
+    private string regPassword = "";
+    private string regMessage = "";
+    private bool regSuccess = false;
+
+    private void SwitchToSignUp()
+    {
+        isSignUp = true;
+        loginMessage = "";
+    }
+
+    private void SwitchToLogin()
+    {
+        isSignUp = false;
+        regMessage = "";
+    }
+
+    private void HandleLogin()
+    {
+        // TODO: înlocuiește cu apel real la API când backend-ul e gata
+        if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
+        {
+            loginSuccess = false;
+            loginMessage = "Completează toate câmpurile!";
+            return;
+        }
+
+        if (loginUsername == "admin" && loginPassword == "admin1234")
+        {
+            loginSuccess = true;
+            loginMessage = "Autentificare reușită! Se încarcă...";
+            NavManager.NavigateTo("/Home");
+        }
+        else
+        {
+            loginSuccess = false;
+            loginMessage = "Utilizator sau parolă greșite.";
+        }
+    }
+
+    private void HandleRegister()
+    {
+        // TODO: înlocuiește cu apel real la API când backend-ul e gata
+        if (string.IsNullOrWhiteSpace(regUsername) || string.IsNullOrWhiteSpace(regEmail) || string.IsNullOrWhiteSpace(regPassword))
+        {
+            regSuccess = false;
+            regMessage = "Completează toate câmpurile!";
+            return;
+        }
+
+        if (regPassword.Length < 6)
+        {
+            regSuccess = false;
+            regMessage = "Parola trebuie să aibă minim 6 caractere.";
+            return;
+        }
+
+        // Momentan simulăm success – API-ul va face înregistrarea reală
+        regSuccess = true;
+        regMessage = "Cont creat! Acum te poți autentifica.";
+    }
+}
+
+<style>
+    /* ─── RESET & GLOBALS ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+        --black:    #080808;
+        --dark:     #111111;
+        --panel:    #1a1a1a;
+        --red:      #C41E3A;
+        --red-dark: #8B0000;
+        --red-glow: rgba(196, 30, 58, 0.4);
+        --gold:     #D4AF37;
+        --gold-dim: rgba(212, 175, 55, 0.15);
+        --white:    #f0e6d3;
+        --grey:     #888;
+        --font-display: 'Playfair Display', Georgia, serif;
+        --font-body:    'Rajdhani', sans-serif;
+        --transition:   0.6s ease-in-out;
+    }
+
+    /* ─── BACKGROUND ─── */
+    .casino-bg {
+        position: fixed;   /* iese complet din fluxul normal */
+        inset: 0; 
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--black);
+        background-image:
+            radial-gradient(ellipse 80% 60% at 50% 50%, #1a0508 0%, transparent 70%),
+            repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 40px,
+                rgba(212,175,55,0.03) 40px,
+                rgba(212,175,55,0.03) 41px
+            );
+        font-family: var(--font-body);
+        overflow: hidden;
+    }
+
+    /* ─── FLOATING SUITS ─── */
+    .suit {
+        position: absolute;
+        font-size: 5rem;
+        opacity: 0.04;
+        color: var(--gold);
+        user-select: none;
+        animation: floatSuit 12s ease-in-out infinite;
+    }
+    .s1 { top: 5%;  left: 5%;  animation-delay: 0s;   font-size: 6rem; }
+    .s2 { top: 10%; right: 8%; animation-delay: 2s;   color: var(--red); opacity: 0.05; }
+    .s3 { bottom: 10%; left: 10%; animation-delay: 4s; }
+    .s4 { bottom: 5%;  right: 5%; animation-delay: 1s; font-size: 7rem; }
+    .s5 { top: 40%;  left: 2%;  animation-delay: 3s;   font-size: 4rem; }
+    .s6 { top: 60%;  right: 3%; animation-delay: 5s;   font-size: 4rem; color: var(--red); opacity: 0.04; }
+
+    @@keyframes floatSuit {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50%       { transform: translateY(-20px) rotate(8deg); }
+    }
+
+    /* ─── MAIN CONTAINER ─── */
+    .container {
+        position: relative;
+        width: 820px;
+        max-width: 96vw;
+        min-height: 520px;
+        border-radius: 4px;
+        overflow: hidden;
+        box-shadow:
+            0 0 0 1px rgba(212,175,55,0.2),
+            0 0 60px rgba(196, 30, 58, 0.15),
+            0 30px 80px rgba(0,0,0,0.8);
+    }
+
+    /* ─── FORM CONTAINERS ─── */
+    .form-container {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        width: 50%;
+        transition: all var(--transition);
+        background: var(--dark);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+    }
+
+    .sign-in-container  { left: 0; }
+    .sign-up-container  { left: 0; opacity: 0; z-index: 1; }
+
+    /* Animatie: Sign Up activ */
+    .right-panel-active .sign-in-container {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    .right-panel-active .sign-up-container {
+        transform: translateX(100%);
+        opacity: 1;
+        z-index: 5;
+        animation: showForm 0.6s;
+    }
+
+    @@keyframes showForm {
+        0%   { opacity: 0; transform: translateX(100%) scale(0.97); }
+        100% { opacity: 1; transform: translateX(100%) scale(1); }
+    }
+
+    /* ─── FORM INNER ─── */
+    .form-inner {
+        width: 85%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding: 40px 0;
+    }
+
+    .form-title {
+        font-family: var(--font-display);
+        font-size: 2rem;
+        font-weight: 900;
+        color: var(--white);
+        letter-spacing: 1px;
+        text-align: center;
+        text-shadow: 0 0 20px var(--red-glow);
+    }
+
+    .suits-divider {
+        color: var(--gold);
+        letter-spacing: 8px;
+        font-size: 0.75rem;
+        opacity: 0.7;
+        margin-top: -8px;
+    }
+
+    /* ─── INPUTS ─── */
+    .field-group {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .field-group label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--gold);
+        opacity: 0.8;
+    }
+
+    .field-group input {
+        background: #0f0f0f;
+        border: 1px solid rgba(212,175,55,0.2);
+        border-radius: 2px;
+        color: var(--white);
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+        padding: 10px 14px;
+        outline: none;
+        transition: border-color 0.3s, box-shadow 0.3s;
+        width: 100%;
+    }
+
+    .field-group input::placeholder { color: #444; }
+
+    .field-group input:focus {
+        border-color: var(--red);
+        box-shadow: 0 0 10px var(--red-glow);
+    }
+
+    /* ─── MESSAGES ─── */
+    .msg-box {
+        width: 100%;
+        padding: 8px 12px;
+        border-radius: 2px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-align: center;
+    }
+    .msg-err { background: rgba(139,0,0,0.3); border: 1px solid var(--red-dark); color: #ff8888; }
+    .msg-ok  { background: rgba(0,100,0,0.3);  border: 1px solid #2d6a2d; color: #88ff88; }
+
+    /* ─── BUTTONS ─── */
+    .btn-casino {
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, var(--red-dark) 0%, var(--red) 100%);
+        color: var(--white);
+        border: none;
+        border-radius: 2px;
+        font-family: var(--font-body);
+        font-size: 0.85rem;
+        font-weight: 600;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-top: 4px;
+        box-shadow: 0 4px 20px var(--red-glow);
+    }
+
+    .btn-casino:hover {
+        background: linear-gradient(135deg, var(--red) 0%, #e8203d 100%);
+        box-shadow: 0 6px 30px rgba(196, 30, 58, 0.6);
+        transform: translateY(-1px);
+    }
+
+    .btn-casino:active { transform: translateY(0); }
+
+    .forgot-link {
+        font-size: 0.78rem;
+        color: var(--grey);
+        text-decoration: none;
+        align-self: flex-end;
+        transition: color 0.2s;
+        letter-spacing: 0.5px;
+    }
+    .forgot-link:hover { color: var(--gold); }
+
+    /* ─── OVERLAY ─── */
+    .overlay-container {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 50%;
+        height: 100%;
+        overflow: hidden;
+        transition: transform var(--transition);
+        z-index: 100;
+    }
+
+    .right-panel-active .overlay-container {
+        transform: translateX(-100%);
+    }
+
+    .overlay {
+        background: linear-gradient(160deg, #1a0005 0%, var(--red-dark) 40%, #3d0010 100%);
+        background-attachment: fixed;
+        color: var(--white);
+        position: relative;
+        left: -100%;
+        height: 100%;
+        width: 200%;
+        transform: translateX(0);
+        transition: transform var(--transition);
+        border-left: 1px solid rgba(212,175,55,0.25);
+        border-right: 1px solid rgba(212,175,55,0.25);
+    }
+
+    /* Pattern pe overlay */
+    .overlay::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: repeating-linear-gradient(
+            -45deg,
+            transparent,
+            transparent 20px,
+            rgba(0,0,0,0.08) 20px,
+            rgba(0,0,0,0.08) 21px
+        );
+        pointer-events: none;
+    }
+
+    .right-panel-active .overlay {
+        transform: translateX(50%);
+    }
+
+    .overlay-panel {
+        position: absolute;
+        top: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0 40px;
+        height: 100%;
+        width: 50%;
+        transition: transform var(--transition);
+        gap: 16px;
+    }
+
+    .overlay-left  { left: 0;   transform: translateX(-20%); }
+    .overlay-right { right: 0;  transform: translateX(0); }
+
+    .right-panel-active .overlay-left  { transform: translateX(0); }
+    .right-panel-active .overlay-right { transform: translateX(20%); }
+
+    .panel-chip {
+        font-size: 2.5rem;
+        filter: drop-shadow(0 0 10px rgba(212,175,55,0.5));
+        animation: pulse 3s ease-in-out infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50%       { transform: scale(1.08); }
+    }
+
+    .overlay-panel h1 {
+        font-family: var(--font-display);
+        font-size: 1.8rem;
+        font-weight: 900;
+        color: var(--white);
+        text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        letter-spacing: 1px;
+    }
+
+    .overlay-panel p {
+        font-size: 0.88rem;
+        line-height: 1.6;
+        color: rgba(240,230,211,0.75);
+        letter-spacing: 0.3px;
+    }
+
+    .btn-ghost {
+        padding: 11px 32px;
+        background: transparent;
+        border: 1px solid var(--gold);
+        color: var(--gold);
+        border-radius: 2px;
+        font-family: var(--font-body);
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-top: 4px;
+    }
+
+    .btn-ghost:hover {
+        background: var(--gold);
+        color: var(--black);
+        box-shadow: 0 4px 20px rgba(212,175,55,0.4);
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @@media (max-width: 640px) {
+        .container { min-height: 100vh; border-radius: 0; }
+        .overlay-container { display: none; }
+        .form-container { width: 100%; }
+        .sign-up-container { display: none; }
+        .right-panel-active .sign-up-container { display: flex; transform: none; }
+        .right-panel-active .sign-in-container { display: none; }
+    }
+</style>
