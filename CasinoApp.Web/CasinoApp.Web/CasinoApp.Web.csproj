@@ -7,9 +7,10 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\CasinoApp.Web.Client\CasinoApp.Web.Client.csproj" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.6" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\CasinoApp.Web.Client\CasinoApp.Web.Client.csproj" />
+		<ProjectReference Include="..\..\CasinoApp.DataAccess\CasinoApp.DataAccess.csproj" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.6" />
+	</ItemGroup>
 
 </Project>
