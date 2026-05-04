@@ -1,14 +1,21 @@
 using CasinoApp.Web.Client.Pages;
 using CasinoApp.Web.Components;
+using CasinoApp.DataAccess;
+using CasinoApp.DataAccess.DB_operations;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddScoped<PlayerRepository>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 
+
+
+
 var app = builder.Build();
+DatabaseInitializer.Initialize();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
