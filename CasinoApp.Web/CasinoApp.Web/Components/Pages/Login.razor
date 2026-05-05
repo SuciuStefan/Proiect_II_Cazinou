@@ -4,6 +4,7 @@
 @using CasinoApp.DataAccess.Entities
 @using CasinoApp.DataAccess.DB_operations
 @inject PlayerRepository PlayerRepo
+@inject CasinoApp.Web.Services.SessionService Session
 
 
 <PageTitle>CasinoApp – Intră în Joc</PageTitle>
@@ -102,108 +103,84 @@
 </div>
 
 @code {
-    // Starea panoului: false = Sign In, true = Sign Up
     private bool isSignUp = false;
 
-    // Câmpuri Sign In
     private string loginUsername = "";
     private string loginPassword = "";
-    private string loginMessage = "";
-    private bool loginSuccess = false;
+    private string loginMessage  = "";
+    private bool   loginSuccess  = false;
 
-    // Câmpuri Sign Up
     private string regUsername = "";
-    private string regEmail = "";
+    private string regEmail    = "";
     private string regPassword = "";
-    private string regMessage = "";
-    private bool regSuccess = false;
+    private string regMessage  = "";
+    private bool   regSuccess  = false;
 
-    private void SwitchToSignUp()
-    {
-        isSignUp = true;
-        loginMessage = "";
-    }
-
-    private void SwitchToLogin()
-    {
-        isSignUp = false;
-        regMessage = "";
-    }
+    private void SwitchToSignUp() { isSignUp = true;  loginMessage = ""; }
+    private void SwitchToLogin()  { isSignUp = false; regMessage   = ""; }
 
     private void HandleLogin()
-{
-    if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
     {
-        loginSuccess = false;
-        loginMessage = "Completează toate câmpurile!";
-        return;
+        if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
+        {
+            loginSuccess = false;
+            loginMessage = "Completează toate câmpurile!";
+            return;
+        }
+
+        var player = PlayerRepo.GetByUsername(loginUsername);
+
+        if (player != null && player.Password == loginPassword)
+        {
+            Session.SetPlayer(player); // ← SALVEAZA playerul in "cutie"
+            loginSuccess = true;
+            loginMessage = "Autentificare reușită!";
+            NavManager.NavigateTo("/Home");
+        }
+        else
+        {
+            loginSuccess = false;
+            loginMessage = "Utilizator sau parolă greșite.";
+        }
     }
 
-    var player = PlayerRepo.GetByUsername(loginUsername);
+    private void HandleRegister()
+    {
+        if (string.IsNullOrWhiteSpace(regUsername) || string.IsNullOrWhiteSpace(regEmail) || string.IsNullOrWhiteSpace(regPassword))
+        {
+            regSuccess = false;
+            regMessage = "Completează toate câmpurile!";
+            return;
+        }
 
-    if (player != null && player.Password == loginPassword)
-    {
-        loginSuccess = true;
-        loginMessage = "Autentificare reușită!";
-        NavManager.NavigateTo("/Home");
-    }
-    else
-    {
-        loginSuccess = false;
-        loginMessage = "Utilizator sau parolă greșite.";
+        if (regPassword.Length < 6)
+        {
+            regSuccess = false;
+            regMessage = "Parola trebuie să aibă minim 6 caractere.";
+            return;
+        }
+
+        var existing = PlayerRepo.GetByUsername(regUsername);
+        if (existing != null)
+        {
+            regSuccess = false;
+            regMessage = "Username-ul există deja!";
+            return;
+        }
+
+        PlayerRepo.Create(new CasinoApp.DataAccess.Entities.Player
+        {
+            Username  = regUsername,
+            Email     = regEmail,
+            Password  = regPassword,
+            Balance   = 500.00 // bonus de bun venit
+        });
+
+        regSuccess = true;
+        regMessage = "Cont creat cu 500 RON bonus! Te poți autentifica.";
     }
 }
 
-  private void HandleRegister()
-{
-    if (string.IsNullOrWhiteSpace(regUsername) ||
-        string.IsNullOrWhiteSpace(regEmail) ||
-        string.IsNullOrWhiteSpace(regPassword))
-    {
-        regSuccess = false;
-        regMessage = "Completează toate câmpurile!";
-        return;
-    }
-
-    if (regPassword.Length < 6)
-    {
-        regSuccess = false;
-        regMessage = "Parola trebuie să aibă minim 6 caractere.";
-        return;
-    }
-
-    if (PlayerRepo.GetByUsername(regUsername) != null)
-    {
-        regSuccess = false;
-        regMessage = "Acest username există deja.";
-        return;
-    }
-
-    if (PlayerRepo.GetByEmail(regEmail) != null)
-    {
-        regSuccess = false;
-        regMessage = "Acest email există deja.";
-        return;
-    }
-
-    var player = new Player
-    {
-        Username = regUsername,
-        Email = regEmail,
-        Password = regPassword,
-        Balance = 0
-    };
-
-    PlayerRepo.Create(player);
-
-    regSuccess = true;
-    regMessage = "Cont creat! Acum te poți autentifica.";
-
-    regUsername = "";
-    regEmail = "";
-    regPassword = "";
-}
-}
 
 <style>
     /* ─── RESET & GLOBALS ─── */
@@ -252,7 +229,7 @@
     .suit {
         position: absolute;
         font-size: 5rem;
-        opacity: 0.04;
+        opacity: 0.15;
         color: var(--gold);
         user-select: none;
         animation: floatSuit 12s ease-in-out infinite;
@@ -551,7 +528,8 @@
         box-shadow: 0 4px 20px rgba(212,175,55,0.4);
     }
 
-    /* ─── RESPONSIVE ─── */
+    /* ─── RESPONSIVE ─── *
+
     @@media (max-width: 640px) {
         .container { min-height: 100vh; border-radius: 0; }
         .overlay-container { display: none; }
