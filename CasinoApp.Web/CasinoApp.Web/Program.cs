@@ -1,10 +1,12 @@
-using CasinoApp.Web.Client.Pages;
-using CasinoApp.Web.Components;
 using CasinoApp.DataAccess;
 using CasinoApp.DataAccess.DB_operations;
+using CasinoApp.Web.Client.Pages;
+using CasinoApp.Web.Components;
+using CasinoApp.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<PlayerRepository>();
+builder.Services.AddScoped<SessionService>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()

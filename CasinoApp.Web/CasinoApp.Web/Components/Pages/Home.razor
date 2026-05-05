@@ -1,476 +1,506 @@
-﻿@page "/home"
+@page "/Home"
 @rendermode InteractiveServer
 @inject NavigationManager NavManager
+@inject CasinoApp.Web.Services.SessionService Session
+@inject IJSRuntime JS
 
 <PageTitle>Epic Spin – Casino</PageTitle>
-
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
-<!-- ═══════════════════════════════════════════
-     TOP BAR
-═══════════════════════════════════════════ -->
-<div class="topbar">
-    <div class="topbar-left">
-        <div class="logo">
-            <span class="logo-epic">EPIC</span><span class="logo-spin">SPIN</span>
-        </div>
-        <nav class="topnav">
-            <a class="topnav-link @(activePage == "sports" ? "active" : "")" @onclick='() => SetPage("sports")'>Sport</a>
-            <a class="topnav-link @(activePage == "live" ? "active" : "")" @onclick='() => SetPage("live")'>
-                Live <span class="badge">12</span>
-            </a>
-            <a class="topnav-link @(activePage == "casino" ? "active" : "")" @onclick='() => SetPage("casino")'>Casino</a>
-            <a class="topnav-link @(activePage == "casinolive" ? "active" : "")" @onclick='() => SetPage("casinolive")'>Casino Live</a>
-        </nav>
+@if (Session.IsLoggedIn)
+{
+    <!-- FUNDAL ANIMAT -->
+    <div class="bg-layer" aria-hidden="true">
+        <span class="bg-item i1">♠</span>
+        <span class="bg-item i2">♥</span>
+        <span class="bg-item i3">🎲</span>
+        <span class="bg-item i4">♦</span>
+        <span class="bg-item i5">🎡</span>
+        <span class="bg-item i6">♣</span>
+        <span class="bg-item i7">⚽</span>
+        <span class="bg-item i8">♠</span>
+        <span class="bg-item i9">🃏</span>
+        <span class="bg-item i10">♥</span>
+        <span class="bg-item i11">🎰</span>
+        <span class="bg-item i12">♦</span>
     </div>
-    <div class="topbar-right">
-        <div class="user-btn" @onclick="ToggleUserPanel">
-            <div class="user-avatar">
-                <span>@username.Substring(0, 1).ToUpper()</span>
-            </div>
-            <div class="user-info">
-                <span class="user-name">@username</span>
-                <span class="user-balance">@balance.ToString("F2") RON</span>
-            </div>
-            <span class="chevron @(showUserPanel ? "open" : "")">▾</span>
-        </div>
 
-        @if (showUserPanel)
-        {
-            <div class="user-panel">
-                <div class="user-panel-header">
-                    <div class="panel-avatar">@username.Substring(0, 1).ToUpper()</div>
-                    <div>
-                        <div class="panel-username">@username</div>
-                        <div class="panel-email">@email</div>
+    <!-- TOP BAR (se disipeaza la scroll) -->
+    <div class="topbar @(isScrolled ? "topbar-hidden" : "")">
+        <div class="topbar-left">
+            <div class="logo"><span class="logo-epic">EPIC</span><span class="logo-spin">SPIN</span></div>
+            <nav class="topnav">
+                <a class="topnav-link @(activePage=="sports"?"active":"")"  @onclick='()=>activePage="sports"'>Sport</a>
+                <a class="topnav-link @(activePage=="live"?"active":"")"    @onclick='()=>activePage="live"'>Live <span class="badge">12</span></a>
+                <a class="topnav-link @(activePage=="casino"?"active":"")"  @onclick='()=>activePage="casino"'>Casino</a>
+                <a class="topnav-link @(activePage=="clive"?"active":"")"   @onclick='()=>activePage="clive"'>Casino Live</a>
+            </nav>
+        </div>
+        <div class="topbar-right">
+            <div class="user-btn" @onclick="ToggleUserPanel">
+                <div class="user-avatar">@Session.CurrentPlayer!.Username.Substring(0,1).ToUpper()</div>
+                <div class="user-info">
+                    <span class="user-name">@Session.CurrentPlayer.Username</span>
+                    <span class="user-balance">@Session.CurrentPlayer.Balance.ToString("F2") RON</span>
+                </div>
+                <span class="chevron @(showPanel?"open":"")">▾</span>
+            </div>
+            @if (showPanel)
+            {
+                <div class="user-panel">
+                    <div class="up-header">
+                        <div class="up-avatar">@Session.CurrentPlayer.Username.Substring(0,1).ToUpper()</div>
+                        <div>
+                            <div class="up-name">@Session.CurrentPlayer.Username</div>
+                            <div class="up-email">@Session.CurrentPlayer.Email</div>
+                        </div>
+                    </div>
+                    <div class="up-divider"></div>
+                    <div class="up-balance">
+                        <span class="up-label">BALANȚĂ</span>
+                        <span class="up-amount">@Session.CurrentPlayer.Balance.ToString("F2") RON</span>
+                    </div>
+                    <div class="up-actions">
+                        <button class="up-btn deposit">+ Depune</button>
+                        <button class="up-btn withdraw">Retrage</button>
+                    </div>
+                    <div class="up-divider"></div>
+                    <a class="up-menu-item" href="#">⚙ Setări cont</a>
+                    <a class="up-menu-item" href="#">📜 Istoric tranzacții</a>
+                    <a class="up-menu-item" href="#">🎁 Bonusuri active</a>
+                    <div class="up-divider"></div>
+                    <button class="up-logout" @onclick="Logout">⏻ Deconectare</button>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- PROFIL FLOTANT (apare cand topbar dispare) -->
+    @if (isScrolled)
+    {
+        <div class="floating-profile @(showPanel ? "panel-open" : "")" @onclick="ToggleUserPanel">
+            <div class="fp-avatar">@Session.CurrentPlayer.Username.Substring(0,1).ToUpper()</div>
+            <div class="fp-info">
+                <span class="fp-name">@Session.CurrentPlayer.Username</span>
+                <span class="fp-balance">@Session.CurrentPlayer.Balance.ToString("F2") RON</span>
+            </div>
+            <span class="fp-chevron @(showPanel?"open":"")">▾</span>
+
+            @if (showPanel)
+            {
+                <div class="user-panel fp-panel">
+                    <div class="up-header">
+                        <div class="up-avatar">@Session.CurrentPlayer.Username.Substring(0,1).ToUpper()</div>
+                        <div>
+                            <div class="up-name">@Session.CurrentPlayer.Username</div>
+                            <div class="up-email">@Session.CurrentPlayer.Email</div>
+                        </div>
+                    </div>
+                    <div class="up-divider"></div>
+                    <div class="up-balance">
+                        <span class="up-label">BALANȚĂ</span>
+                        <span class="up-amount">@Session.CurrentPlayer.Balance.ToString("F2") RON</span>
+                    </div>
+                    <div class="up-actions">
+                        <button class="up-btn deposit">+ Depune</button>
+                        <button class="up-btn withdraw">Retrage</button>
+                    </div>
+                    <div class="up-divider"></div>
+                    <a class="up-menu-item" href="#">⚙ Setări cont</a>
+                    <a class="up-menu-item" href="#">📜 Istoric tranzacții</a>
+                    <a class="up-menu-item" href="#">🎁 Bonusuri active</a>
+                    <div class="up-divider"></div>
+                    <button class="up-logout" @onclick="Logout">⏻ Deconectare</button>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- MODAL CONFIRMARE SCHIMBARE JOC -->
+    @if (showConfirm)
+    {
+        <div class="modal-overlay" @onclick="CancelSwitch">
+            <div class="modal-box" @onclick:stopPropagation="true">
+                <div class="modal-icon">⚠️</div>
+                <div class="modal-title">Schimbi jocul?</div>
+                <div class="modal-msg">
+                    Ești în mijlocul unui joc de <strong>@GetGameTitle(activeGame)</strong>.<br/>
+                    Dacă schimbi, progresul curent se pierde.
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn cancel" @onclick="CancelSwitch">Rămân aici</button>
+                    <button class="modal-btn confirm" @onclick="ConfirmSwitch">Schimbă jocul</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- LAYOUT -->
+    <div class="layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sb-title">JOCURI</div>
+            <a class="sb-item @(activeGame=="blackjack"?"active":"")"  @onclick='()=>TrySetGame("blackjack")'><span>🃏</span> BlackJack</a>
+            <a class="sb-item @(activeGame=="slots"?"active":"")"      @onclick='()=>TrySetGame("slots")'><span>🎰</span> Slots</a>
+            <a class="sb-item @(activeGame=="craps"?"active":"")"      @onclick='()=>TrySetGame("craps")'><span>🎲</span> Craps <small class="ro-tag">Barbut</small></a>
+            <a class="sb-item @(activeGame=="poker"?"active":"")"      @onclick='()=>TrySetGame("poker")'><span>♠️</span> Poker</a>
+            <a class="sb-item @(activeGame=="baccarat"?"active":"")"   @onclick='()=>TrySetGame("baccarat")'><span>🎴</span> Baccarat</a>
+            <a class="sb-item @(activeGame=="wheel"?"active":"")"      @onclick='()=>TrySetGame("wheel")'><span>🎯</span> Roata Norocului</a>
+            <a class="sb-item @(activeGame=="scratch"?"active":"")"    @onclick='()=>TrySetGame("scratch")'><span>🎟️</span> Scratch Cards</a>
+            <a class="sb-item @(activeGame.StartsWith("roulette")?"active":"")" @onclick="ToggleRoulette">
+                <span>🎡</span> Ruletă <span class="expand @(showRoulette?"open":"")">▸</span>
+            </a>
+
+        </aside>
+
+        <!-- CONTENT -->
+        <main class="content">
+            <div class="promo-banner">
+                <div>
+                    <div class="promo-tag">CONT NOU</div>
+                    <div class="promo-title">100% BONUS<br/>PÂNĂ LA 500 RON</div>
+                    <button class="promo-btn">PROFITĂ ACUM</button>
+                </div>
+                <div class="promo-deco">🎰</div>
+            </div>
+
+            <div class="section-title">JOCURILE NOASTRE</div>
+            <div class="games-grid">
+                <div class="game-card @(activeGame=="blackjack"?"selected":"")"     @onclick='()=>TrySetGame("blackjack")'><div class="gi bj">🃏</div><div class="gn">BlackJack</div><div class="gd">Ajunge la 21 fără să treci</div><span class="gb hot">HOT</span></div>
+                <div class="game-card @(activeGame=="slots"?"selected":"")"         @onclick='()=>TrySetGame("slots")'><div class="gi sl">🎰</div><div class="gn">Slots</div><div class="gd">Jackpot-uri uriașe te așteaptă</div><span class="gb new">NOU</span></div>
+                <div class="game-card @(activeGame=="craps"?"selected":"")"         @onclick='()=>TrySetGame("craps")'><div class="gi cr">🎲</div><div class="gn">Craps</div><div class="gd">Barbut — zaruri și adrenalină</div></div>
+                <div class="game-card @(activeGame=="roulette-red"?"selected":"")"  @onclick='()=>TrySetGame("roulette-red")'><div class="gi ro">🎡</div><div class="gn">Ruletă</div><div class="gd">Roșu, negru sau verde</div><span class="gb live">LIVE</span></div>
+                <div class="game-card @(activeGame=="poker"?"selected":"")"         @onclick='()=>TrySetGame("poker")'><div class="gi pk">♠️</div><div class="gn">Poker</div><div class="gd">Texas Hold'em clasic</div><span class="gb hot">HOT</span></div>
+                <div class="game-card @(activeGame=="baccarat"?"selected":"")"      @onclick='()=>TrySetGame("baccarat")'><div class="gi ba">🎴</div><div class="gn">Baccarat</div><div class="gd">Player vs Banker</div></div>
+                <div class="game-card @(activeGame=="wheel"?"selected":"")"         @onclick='()=>TrySetGame("wheel")'><div class="gi wh">🎯</div><div class="gn">Roata Norocului</div><div class="gd">Învârte și câștigă</div><span class="gb new">NOU</span></div>
+                <div class="game-card @(activeGame=="scratch"?"selected":"")"       @onclick='()=>TrySetGame("scratch")'><div class="gi sc">🎟️</div><div class="gn">Scratch Cards</div><div class="gd">Zgârie și descoperă premiul</div></div>
+            </div>
+
+            <!-- ZONA JOC — are id pt smooth scroll -->
+            @if (!string.IsNullOrEmpty(activeGame))
+            {
+                <div class="game-area" id="game-area">
+                    <div class="ga-title">
+                        @GetGameTitle(activeGame)
+                        <span class="ga-close" @onclick="CloseGame">✕</span>
+                    </div>
+                    <div class="ga-placeholder">
+                        🚧 <strong>@GetGameTitle(activeGame)</strong> se construiește...<br/>
+                        <span>Logica jocului va fi adăugată aici</span>
                     </div>
                 </div>
-                <div class="panel-divider"></div>
-                <div class="panel-balance-box">
-                    <span class="panel-label">BALANȚĂ</span>
-                    <span class="panel-amount">@balance.ToString("F2") RON</span>
-                </div>
-                <div class="panel-actions">
-                    <button class="panel-btn deposit">+ Depune</button>
-                    <button class="panel-btn withdraw">Retrage</button>
-                </div>
-                <div class="panel-divider"></div>
-                <div class="panel-menu">
-                    <a class="panel-menu-item" href="#">⚙ Setări cont</a>
-                    <a class="panel-menu-item" href="#">📜 Istoric tranzacții</a>
-                    <a class="panel-menu-item" href="#">🎁 Bonusuri active</a>
-                </div>
-                <div class="panel-divider"></div>
-                <button class="panel-logout" @onclick="Logout">⏻ Deconectare</button>
-            </div>
-        }
+            }
+        </main>
     </div>
-</div>
-
-<!-- ═══════════════════════════════════════════
-     LAYOUT PRINCIPAL
-═══════════════════════════════════════════ -->
-<div class="layout">
-
-    <!-- ── SIDEBAR STÂNGA ── -->
-    <aside class="sidebar">
-        <div class="sidebar-section-title">JOCURI</div>
-
-        <a class="sidebar-item @(activeGame == "blackjack" ? "active" : "")" @onclick='() => SetGame("blackjack")'>
-            <span class="sidebar-icon">🃏</span>
-            <span>BlackJack</span>
-        </a>
-        <a class="sidebar-item @(activeGame == "slots" ? "active" : "")" @onclick='() => SetGame("slots")'>
-            <span class="sidebar-icon">🎰</span>
-            <span>Slots</span>
-        </a>
-        <a class="sidebar-item @(activeGame == "craps" ? "active" : "")" @onclick='() => SetGame("craps")'>
-            <span class="sidebar-icon">🎲</span>
-            <span>Craps <span class="ro-tag">Barbut</span></span>
-        </a>
-
-        <a class="sidebar-item @(activeGame.StartsWith("roulette") ? "active" : "")" @onclick="ToggleRoulette">
-            <span class="sidebar-icon">🎡</span>
-            <span>Ruletă</span>
-            <span class="expand-arrow @(showRoulette ? "open" : "")">▸</span>
-        </a>
-        @if (showRoulette)
-        {
-            <div class="sidebar-sub">
-                <a class="sidebar-sub-item @(activeGame == "roulette-red" ? "active" : "")" @onclick='() => SetGame("roulette-red")'>
-                    <span class="dot red"></span> Red
-                </a>
-                <a class="sidebar-sub-item @(activeGame == "roulette-black" ? "active" : "")" @onclick='() => SetGame("roulette-black")'>
-                    <span class="dot black"></span> Black
-                </a>
-                <a class="sidebar-sub-item @(activeGame == "roulette-green" ? "active" : "")" @onclick='() => SetGame("roulette-green")'>
-                    <span class="dot green"></span> Green
-                </a>
-            </div>
-        }
-    </aside>
-
-    <!-- ── CONȚINUT PRINCIPAL ── -->
-    <main class="content">
-
-        <div class="promo-banner">
-            <div class="promo-text">
-                <div class="promo-tag">CONT NOU</div>
-                <div class="promo-title">100% BONUS<br/>PÂNĂ LA 500 RON</div>
-                <button class="promo-btn">PROFITĂ ACUM</button>
-            </div>
-            <div class="promo-deco">🎰</div>
-        </div>
-
-        <div class="section-title">JOCURILE NOASTRE</div>
-        <div class="games-grid">
-            <div class="game-card" @onclick='() => SetGame("blackjack")'>
-                <div class="game-icon-wrap bj">🃏</div>
-                <div class="game-name">BlackJack</div>
-                <div class="game-desc">Ajunge la 21 fără să treci</div>
-                <div class="game-badge hot">HOT</div>
-            </div>
-            <div class="game-card" @onclick='() => SetGame("slots")'>
-                <div class="game-icon-wrap sl">🎰</div>
-                <div class="game-name">Slots</div>
-                <div class="game-desc">Jackpot-uri uriașe te așteaptă</div>
-                <div class="game-badge new">NOU</div>
-            </div>
-            <div class="game-card" @onclick='() => SetGame("craps")'>
-                <div class="game-icon-wrap cr">🎲</div>
-                <div class="game-name">Craps</div>
-                <div class="game-desc">Barbut — zaruri, noroc, adrenalină</div>
-            </div>
-            <div class="game-card" @onclick='() => SetGame("roulette-red")'>
-                <div class="game-icon-wrap ro">🎡</div>
-                <div class="game-name">Ruletă</div>
-                <div class="game-desc">Roșu, negru sau verde</div>
-                <div class="game-badge hot">LIVE</div>
-            </div>
-        </div>
-
-        @if (!string.IsNullOrEmpty(activeGame))
-        {
-            <div class="game-area">
-                <div class="game-area-title">
-                    @GetGameTitle(activeGame)
-                    <span class="game-area-close" @onclick='() => activeGame = ""'>✕</span>
-                </div>
-                <div class="game-area-placeholder">
-                    🚧 Jocul <strong>@GetGameTitle(activeGame)</strong> se construiește...<br/>
-                    <span>Pagina de joc va fi adăugată aici</span>
-                </div>
-            </div>
-        }
-
-    </main>
-</div>
+}
 
 @code {
     private string activePage   = "casino";
     private string activeGame   = "";
-    private bool   showRoulette  = false;
-    private bool   showUserPanel = false;
+    private bool   showRoulette = false;
+    private bool   showPanel    = false;
+    private bool   isScrolled   = false;
 
-    // TODO: înlocuiește cu date reale din sesiune după ce implementezi auth
-    private string username = "LuckyAce99";
-    private string email    = "user@epicspin.ro";
-    private double balance  = 1250.00;
+    // Pentru confirmarea schimbarii jocului
+    private bool   showConfirm  = false;
+    private string pendingGame  = "";
 
-    private void SetPage(string page) => activePage = page;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!Session.IsLoggedIn)
+            {
+                NavManager.NavigateTo("/");
+                return;
+            }
+            // Inregistreaza listener de scroll care apeleaza C# din JS
+            await JS.InvokeVoidAsync("initScrollWatcher", DotNetObjectReference.Create(this));
+        }
+    }
 
-    private void SetGame(string game)
+    // Apelat din JavaScript la scroll
+    [JSInvokable]
+    public void OnScroll(bool scrolled)
+    {
+        isScrolled = scrolled;
+        InvokeAsync(StateHasChanged);
+    }
+
+    // Incearca sa seteze jocul — daca e altul activ, cere confirmare
+    private void TrySetGame(string game)
+    {
+        if (!string.IsNullOrEmpty(activeGame) && activeGame != game)
+        {
+            pendingGame = game;
+            showConfirm = true;
+        }
+        else
+        {
+            SetGame(game);
+        }
+    }
+
+    private async void SetGame(string game)
     {
         activeGame = game;
         if (game.StartsWith("roulette")) showRoulette = true;
+        StateHasChanged();
+        // Scroll lin la sectiunea de joc
+        await Task.Delay(100); 
+        await JS.InvokeVoidAsync("scrollToElement", "game-area");
+    }
+
+    private void ConfirmSwitch()
+    {
+        showConfirm = false;
+        SetGame(pendingGame);
+        pendingGame = "";
+    }
+
+    private void CancelSwitch()
+    {
+        showConfirm = false;
+        pendingGame = "";
+    }
+
+    private void CloseGame()
+    {
+        activeGame = "";
     }
 
     private void ToggleRoulette()
     {
         showRoulette = !showRoulette;
-        if (!activeGame.StartsWith("roulette"))
-            activeGame = "roulette-red";
+        if (!activeGame.StartsWith("roulette")) TrySetGame("roulette-red");
     }
 
-    private void ToggleUserPanel() => showUserPanel = !showUserPanel;
+    private void ToggleUserPanel() => showPanel = !showPanel;
 
     private void Logout()
     {
-        showUserPanel = false;
-        NavManager.NavigateTo("/login");
+        Session.Clear();
+        showPanel = false;
+        NavManager.NavigateTo("/");
     }
 
-    private string GetGameTitle(string game) => game switch
+    private string GetGameTitle(string g) => g switch
     {
-        "blackjack"      => "BlackJack",
-        "slots"          => "Slots",
-        "craps"          => "Craps (Barbut)",
-        "roulette-red"   => "Ruletă — Red",
-        "roulette-black" => "Ruletă — Black",
-        "roulette-green" => "Ruletă — Green",
-        _                => game
+        "blackjack"      => "BlackJack",      "slots"          => "Slots",
+        "craps"          => "Craps (Barbut)", "poker"          => "Poker",
+        "baccarat"       => "Baccarat",       "wheel"          => "Roata Norocului",
+        "scratch"        => "Scratch Cards",  "roulette-red"   => "Ruletă — Red",
+        "roulette-black" => "Ruletă — Black", "roulette-green" => "Ruletă — Green",
+        _ => g
     };
 }
 
 <style>
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #111; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: #444; }
     :root {
-        --black:   #0a0a0a;
-        --dark:    #141414;
-        --panel:   #1c1c1c;
-        --border:  rgba(255,255,255,0.07);
-        --red:     #C41E3A;
-        --red-dim: rgba(196,30,58,0.15);
-        --gold:    #D4AF37;
-        --white:   #f0e6d3;
-        --grey:    #666;
-        --font-h:  'Bebas Neue', sans-serif;
-        --font-b:  'Rajdhani', sans-serif;
-        --sidebar: 220px;
-        --topbar:  56px;
+        --black:#080808; --dark:#111; --panel:#191919;
+        --border:rgba(255,255,255,0.07);
+        --red:#C41E3A; --red-dim:rgba(196,30,58,0.15);
+        --gold:#D4AF37; --white:#f0e6d3; --grey:#555;
+        --fh:'Bebas Neue',sans-serif; --fb:'Rajdhani',sans-serif;
+        --sb:260px; --tb:68px;
     }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    a{text-decoration:none;cursor:pointer;}
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    a { text-decoration: none; cursor: pointer; }
+    /* FUNDAL */
+    .bg-layer{position:fixed;inset:0;pointer-events:none;z-index:500;overflow:hidden;}
+    .bg-item{position:absolute;font-size:3.5rem;opacity:0.08;user-select:none;animation:bgFloat 15s ease-in-out infinite;color:var(--gold);}
+    .i1{top:5%;left:3%;animation-delay:0s;font-size:5rem;}
+    .i2{top:8%;right:6%;animation-delay:2s;color:var(--red);opacity:.06;}
+    .i3{top:25%;left:1%;animation-delay:4s;font-size:3rem;}
+    .i4{top:40%;right:2%;animation-delay:1s;font-size:4rem;}
+    .i5{top:60%;left:4%;animation-delay:3s;}
+    .i6{top:75%;right:5%;animation-delay:5s;font-size:4rem;}
+    .i7{bottom:8%;left:8%;animation-delay:2.5s;font-size:3rem;color:var(--white);opacity:.05;}
+    .i8{bottom:5%;right:10%;animation-delay:6s;font-size:5rem;}
+    .i9{top:50%;left:47%;animation-delay:7s;font-size:2.5rem;opacity:.05;}
+    .i10{top:15%;left:20%;animation-delay:3.5s;font-size:3rem;color:var(--red);opacity:.06;}
+    .i11{top:70%;right:20%;animation-delay:1.5s;font-size:3rem;}
+    .i12{bottom:20%;left:30%;animation-delay:4.5s;font-size:4rem;color:var(--red);opacity:.06;}
+    @@keyframes bgFloat{0%,100%{transform:translateY(0) rotate(0deg);}33%{transform:translateY(-18px) rotate(5deg);}66%{transform:translateY(10px) rotate(-4deg);}}
 
-    .topbar {
-        position: fixed; top: 0; left: 0; right: 0;
-        height: var(--topbar);
-        background: #0f0f0f;
-        border-bottom: 1px solid var(--border);
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0 20px; z-index: 1000;
+    /* TOPBAR */
+    .topbar{
+        position:fixed;top:0;left:0;right:0;height:var(--tb);
+        background:rgba(8,8,8,0.96);backdrop-filter:blur(10px);
+        border-bottom:1px solid var(--border);
+        display:flex;align-items:center;justify-content:space-between;
+        padding:0 28px;z-index:1000;
+        transition: opacity 0.4s ease, transform 0.4s ease;
     }
-    .topbar-left  { display: flex; align-items: center; gap: 32px; }
-    .topbar-right { display: flex; align-items: center; gap: 12px; position: relative; }
-
-    .logo { font-family: var(--font-h); font-size: 1.6rem; letter-spacing: 2px; line-height: 1; }
-    .logo-epic { color: var(--white); }
-    .logo-spin { color: var(--red); }
-
-    .topnav { display: flex; gap: 4px; }
-    .topnav-link {
-        padding: 6px 14px; border-radius: 4px;
-        font-family: var(--font-b); font-size: 0.85rem; font-weight: 600;
-        letter-spacing: 0.5px; color: #aaa; transition: all 0.2s;
-        display: flex; align-items: center; gap: 6px;
-    }
-    .topnav-link:hover  { color: var(--white); background: rgba(255,255,255,0.06); }
-    .topnav-link.active { color: var(--white); background: var(--red-dim); border-bottom: 2px solid var(--red); }
-
-    .badge {
-        background: var(--red); color: white;
-        font-size: 0.65rem; font-weight: 700;
-        padding: 1px 6px; border-radius: 99px;
-    }
-
-    .user-btn {
-        display: flex; align-items: center; gap: 10px;
-        padding: 6px 12px; border-radius: 6px;
-        background: var(--panel); border: 1px solid var(--border);
-        cursor: pointer; transition: all 0.2s; user-select: none;
-    }
-    .user-btn:hover { border-color: var(--red); background: #222; }
-
-    .user-avatar {
-        width: 30px; height: 30px; border-radius: 50%;
-        background: linear-gradient(135deg, var(--red), #8B0000);
-        display: flex; align-items: center; justify-content: center;
-        font-family: var(--font-h); font-size: 1rem; color: white;
-    }
-    .user-info { display: flex; flex-direction: column; line-height: 1.2; }
-    .user-name    { font-family: var(--font-b); font-size: 0.8rem; font-weight: 600; color: var(--white); }
-    .user-balance { font-family: var(--font-b); font-size: 0.72rem; color: var(--gold); }
-    .chevron { color: #666; font-size: 0.8rem; transition: transform 0.2s; }
-    .chevron.open { transform: rotate(180deg); }
-
-    .user-panel {
-        position: absolute; top: calc(100% + 10px); right: 0;
-        width: 280px; background: #1a1a1a;
-        border: 1px solid rgba(212,175,55,0.2);
-        border-radius: 8px; padding: 16px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-        z-index: 2000;
-        animation: dropIn 0.15s ease;
-    }
-    @@keyframes dropIn {
-        from { opacity: 0; transform: translateY(-8px); }
-        to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .user-panel-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-    .panel-avatar {
-        width: 42px; height: 42px; border-radius: 50%;
-        background: linear-gradient(135deg, var(--red), #8B0000);
-        display: flex; align-items: center; justify-content: center;
-        font-family: var(--font-h); font-size: 1.3rem; color: white; flex-shrink: 0;
-    }
-    .panel-username { font-family: var(--font-b); font-weight: 700; color: var(--white); font-size: 0.95rem; }
-    .panel-email    { font-family: var(--font-b); color: #666; font-size: 0.75rem; }
-    .panel-divider  { height: 1px; background: var(--border); margin: 12px 0; }
-
-    .panel-balance-box {
-        display: flex; justify-content: space-between; align-items: center;
-        background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.15);
-        border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;
-    }
-    .panel-label  { font-family: var(--font-b); font-size: 0.7rem; letter-spacing: 2px; color: #666; }
-    .panel-amount { font-family: var(--font-h); font-size: 1.2rem; color: var(--gold); letter-spacing: 1px; }
-
-    .panel-actions { display: flex; gap: 8px; margin-bottom: 4px; }
-    .panel-btn {
-        flex: 1; padding: 8px; border: none; border-radius: 4px;
-        font-family: var(--font-b); font-size: 0.8rem; font-weight: 700;
-        letter-spacing: 1px; cursor: pointer; transition: all 0.2s;
-    }
-    .panel-btn.deposit  { background: var(--red); color: white; }
-    .panel-btn.deposit:hover  { background: #e8203d; }
-    .panel-btn.withdraw { background: #2a2a2a; color: #aaa; border: 1px solid var(--border); }
-    .panel-btn.withdraw:hover { background: #333; color: var(--white); }
-
-    .panel-menu { display: flex; flex-direction: column; gap: 2px; }
-    .panel-menu-item {
-        padding: 8px 10px; border-radius: 4px;
-        font-family: var(--font-b); font-size: 0.82rem; color: #aaa;
-        transition: all 0.2s; display: block;
-    }
-    .panel-menu-item:hover { background: rgba(255,255,255,0.05); color: var(--white); }
-
-    .panel-logout {
-        width: 100%; padding: 9px; border: 1px solid #2a2a2a;
-        background: transparent; border-radius: 4px;
-        font-family: var(--font-b); font-size: 0.8rem;
-        color: #666; cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
-    }
-    .panel-logout:hover { border-color: var(--red); color: #ff6b6b; background: rgba(196,30,58,0.1); }
-
-    .layout {
-        display: flex;
-        margin-top: var(--topbar);
-        min-height: calc(100vh - var(--topbar));
-        background: var(--black);
-        font-family: var(--font-b);
-    }
-
-    .sidebar {
-        width: var(--sidebar); flex-shrink: 0;
-        background: var(--dark); border-right: 1px solid var(--border);
-        padding: 20px 0;
-        position: sticky; top: var(--topbar);
-        height: calc(100vh - var(--topbar)); overflow-y: auto;
-    }
-    .sidebar-section-title {
-        font-size: 0.65rem; letter-spacing: 3px; color: var(--grey);
-        padding: 0 16px 10px; font-weight: 600;
-    }
-    .sidebar-item {
-        display: flex; align-items: center; gap: 10px;
-        padding: 10px 16px; color: #aaa;
-        font-size: 0.9rem; font-weight: 500;
-        transition: all 0.15s; border-left: 2px solid transparent;
-    }
-    .sidebar-item:hover  { color: var(--white); background: rgba(255,255,255,0.04); }
-    .sidebar-item.active { color: var(--white); background: var(--red-dim); border-left-color: var(--red); }
-    .sidebar-icon { font-size: 1.1rem; }
-    .expand-arrow {
-        margin-left: auto; font-size: 0.7rem; color: #555;
-        transition: transform 0.2s; display: inline-block;
-    }
-    .expand-arrow.open { transform: rotate(90deg); }
-    .ro-tag { font-size: 0.65rem; color: var(--gold); opacity: 0.7; margin-left: 4px; }
-
-    .sidebar-sub { padding: 4px 0 4px 32px; }
-    .sidebar-sub-item {
-        display: flex; align-items: center; gap: 8px;
-        padding: 7px 12px; color: #888; font-size: 0.82rem;
-        border-radius: 4px; transition: all 0.15s;
-    }
-    .sidebar-sub-item:hover  { color: var(--white); background: rgba(255,255,255,0.04); }
-    .sidebar-sub-item.active { color: var(--white); }
-
-    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .dot.red   { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
-    .dot.black { background: #555; }
-    .dot.green { background: #27ae60; box-shadow: 0 0 6px #27ae60; }
-
-    .content { flex: 1; padding: 24px; overflow-y: auto; }
-
-    .promo-banner {
-        background: linear-gradient(135deg, #1a0005 0%, #8B0000 50%, #C41E3A 100%);
-        border-radius: 10px; padding: 28px 32px;
-        display: flex; align-items: center; justify-content: space-between;
-        margin-bottom: 28px; border: 1px solid rgba(212,175,55,0.15);
-        position: relative; overflow: hidden;
-    }
-    .promo-banner::before {
-        content: ''; position: absolute; inset: 0;
-        background: repeating-linear-gradient(-45deg, transparent, transparent 20px, rgba(0,0,0,0.06) 20px, rgba(0,0,0,0.06) 21px);
+    /* Topbar se ascunde la scroll */
+    .topbar-hidden {
+        opacity: 0;
+        transform: translateY(-100%);
         pointer-events: none;
     }
-    .promo-tag   { font-size: 0.65rem; letter-spacing: 3px; color: var(--gold); font-weight: 700; margin-bottom: 6px; }
-    .promo-title { font-family: var(--font-h); font-size: 2rem; color: white; line-height: 1.1; letter-spacing: 1px; margin-bottom: 14px; }
-    .promo-btn {
-        background: var(--gold); color: #0a0a0a; border: none;
-        padding: 10px 24px; border-radius: 4px;
-        font-family: var(--font-b); font-size: 0.8rem; font-weight: 700;
-        letter-spacing: 2px; cursor: pointer; transition: all 0.2s;
-    }
-    .promo-btn:hover { background: #e8c84a; transform: translateY(-1px); }
-    .promo-deco { font-size: 5rem; opacity: 0.3; line-height: 1; }
+    .topbar-left{display:flex;align-items:center;gap:36px;}
+    .topbar-right{display:flex;align-items:center;position:relative;}
+    .logo{font-family:var(--fh);font-size:2rem;letter-spacing:3px;line-height:1;}
+    .logo-epic{color:var(--white);} .logo-spin{color:var(--red);}
+    .topnav{display:flex;gap:4px;}
+    .topnav-link{padding:8px 18px;border-radius:4px;font-family:var(--fb);font-size:0.95rem;font-weight:600;letter-spacing:0.5px;color:#888;transition:all 0.2s;display:flex;align-items:center;gap:7px;}
+    .topnav-link:hover{color:var(--white);background:rgba(255,255,255,0.06);}
+    .topnav-link.active{color:var(--white);background:var(--red-dim);border-bottom:2px solid var(--red);}
+    .badge{background:var(--red);color:white;font-size:0.7rem;font-weight:700;padding:2px 7px;border-radius:99px;}
 
-    .section-title {
-        font-family: var(--font-b); font-size: 0.7rem; letter-spacing: 3px;
-        color: var(--grey); font-weight: 600; margin-bottom: 14px;
-    }
-    .games-grid {
-        display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 14px; margin-bottom: 28px;
-    }
-    .game-card {
-        background: var(--panel); border: 1px solid var(--border);
-        border-radius: 8px; padding: 20px; cursor: pointer;
-        transition: all 0.2s; position: relative; overflow: hidden;
-    }
-    .game-card:hover {
-        border-color: var(--red); background: #222;
-        transform: translateY(-2px); box-shadow: 0 8px 24px rgba(196,30,58,0.2);
-    }
-    .game-icon-wrap {
-        width: 50px; height: 50px; border-radius: 12px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.6rem; margin-bottom: 12px;
-    }
-    .game-icon-wrap.bj { background: rgba(196,30,58,0.15); }
-    .game-icon-wrap.sl { background: rgba(212,175,55,0.12); }
-    .game-icon-wrap.cr { background: rgba(100,149,237,0.12); }
-    .game-icon-wrap.ro { background: rgba(39,174,96,0.12); }
-    .game-name { font-family: var(--font-h); font-size: 1.1rem; color: var(--white); letter-spacing: 1px; margin-bottom: 4px; }
-    .game-desc { font-size: 0.75rem; color: #666; line-height: 1.4; }
-    .game-badge {
-        position: absolute; top: 12px; right: 12px;
-        font-size: 0.6rem; font-weight: 700; letter-spacing: 1px;
-        padding: 2px 7px; border-radius: 99px;
-    }
-    .game-badge.hot { background: var(--red); color: white; }
-    .game-badge.new { background: var(--gold); color: #0a0a0a; }
+    /* BUTON CONT */
+    .user-btn{display:flex;align-items:center;gap:12px;padding:8px 16px;border-radius:8px;background:var(--panel);border:1px solid var(--border);cursor:pointer;transition:all 0.2s;user-select:none;}
+    .user-btn:hover{border-color:var(--red);background:#1e1e1e;}
+    .user-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--red),#8B0000);display:flex;align-items:center;justify-content:center;font-family:var(--fh);font-size:1.1rem;color:white;}
+    .user-info{display:flex;flex-direction:column;line-height:1.3;}
+    .user-name{font-family:var(--fb);font-size:0.9rem;font-weight:600;color:var(--white);}
+    .user-balance{font-family:var(--fb);font-size:0.78rem;color:var(--gold);}
+    .chevron{color:#555;font-size:0.85rem;transition:transform 0.2s;margin-left:4px;}
+    .chevron.open{transform:rotate(180deg);}
 
-    .game-area {
-        background: var(--panel); border: 1px solid var(--border);
-        border-radius: 8px; overflow: hidden; animation: fadeUp 0.2s ease;
+    /* PROFIL FLOTANT */
+    .floating-profile {
+        position:fixed;top:12px;right:20px;z-index:1500;
+        display:flex;align-items:center;gap:10px;
+        padding:7px 14px;border-radius:8px;
+        background:rgba(20,20,20,0.92);
+        border:1px solid rgba(212,175,55,0.25);
+        backdrop-filter:blur(12px);
+        cursor:pointer;user-select:none;
+        box-shadow:0 4px 20px rgba(0,0,0,0.6);
+        transition:all 0.2s;
+        animation:slideIn 0.3s ease;
     }
-    @@keyframes fadeUp {
-        from { opacity: 0; transform: translateY(10px); }
-        to   { opacity: 1; transform: translateY(0); }
+    .floating-profile:hover{border-color:var(--red);background:rgba(30,30,30,0.95);}
+    @@keyframes slideIn{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
+    .fp-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--red),#8B0000);display:flex;align-items:center;justify-content:center;font-family:var(--fh);font-size:0.95rem;color:white;}
+    .fp-info{display:flex;flex-direction:column;line-height:1.2;}
+    .fp-name{font-family:var(--fb);font-size:0.78rem;font-weight:600;color:var(--white);}
+    .fp-balance{font-family:var(--fb);font-size:0.7rem;color:var(--gold);}
+    .fp-chevron{color:#555;font-size:0.8rem;transition:transform 0.2s;}
+    .fp-chevron.open{transform:rotate(180deg);}
+    .fp-panel{top:calc(100% + 10px);right:0;position:absolute;}
+
+    /* DROPDOWN CONT */
+    .user-panel{position:absolute;top:calc(100% + 12px);right:0;width:290px;background:#181818;border:1px solid rgba(212,175,55,0.2);border-radius:10px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,0.85);z-index:2000;animation:dropIn 0.15s ease;}
+    @@keyframes dropIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+    .up-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+    .up-avatar{width:46px;height:46px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,var(--red),#8B0000);display:flex;align-items:center;justify-content:center;font-family:var(--fh);font-size:1.4rem;color:white;}
+    .up-name{font-family:var(--fb);font-weight:700;color:var(--white);font-size:1rem;}
+    .up-email{font-family:var(--fb);color:#555;font-size:0.78rem;}
+    .up-divider{height:1px;background:var(--border);margin:12px 0;}
+    .up-balance{display:flex;justify-content:space-between;align-items:center;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.15);border-radius:6px;padding:10px 14px;margin-bottom:12px;}
+    .up-label{font-family:var(--fb);font-size:0.7rem;letter-spacing:2px;color:#555;}
+    .up-amount{font-family:var(--fh);font-size:1.3rem;color:var(--gold);letter-spacing:1px;}
+    .up-actions{display:flex;gap:8px;margin-bottom:4px;}
+    .up-btn{flex:1;padding:9px;border:none;border-radius:4px;font-family:var(--fb);font-size:0.85rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.2s;}
+    .up-btn.deposit{background:var(--red);color:white;} .up-btn.deposit:hover{background:#e8203d;}
+    .up-btn.withdraw{background:#222;color:#888;border:1px solid var(--border);} .up-btn.withdraw:hover{background:#2a2a2a;color:var(--white);}
+    .up-menu-item{display:block;padding:9px 10px;border-radius:4px;font-family:var(--fb);font-size:0.85rem;color:#888;transition:all 0.2s;}
+    .up-menu-item:hover{background:rgba(255,255,255,0.05);color:var(--white);}
+    .up-logout{width:100%;padding:10px;border:1px solid #222;background:transparent;border-radius:4px;font-family:var(--fb);font-size:0.85rem;color:#555;cursor:pointer;transition:all 0.2s;letter-spacing:1px;}
+    .up-logout:hover{border-color:var(--red);color:#ff6b6b;background:rgba(196,30,58,0.1);}
+
+    /* MODAL CONFIRMARE */
+    .modal-overlay{
+        position:fixed;inset:0;background:rgba(0,0,0,0.75);
+        display:flex;align-items:center;justify-content:center;
+        z-index:3000;backdrop-filter:blur(4px);
+        animation:fadeIn 0.15s ease;
     }
-    .game-area-title {
-        padding: 14px 20px; border-bottom: 1px solid var(--border);
-        font-family: var(--font-h); font-size: 1.1rem; letter-spacing: 2px;
-        color: var(--white); display: flex; justify-content: space-between; align-items: center;
+    @@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+    .modal-box{
+        background:#1a1a1a;border:1px solid rgba(212,175,55,0.2);
+        border-radius:12px;padding:32px;width:380px;max-width:90vw;
+        text-align:center;animation:popIn 0.2s ease;
+        box-shadow:0 30px 80px rgba(0,0,0,0.9);
     }
-    .game-area-close { cursor: pointer; color: #555; transition: color 0.2s; font-size: 0.9rem; }
-    .game-area-close:hover { color: var(--red); }
-    .game-area-placeholder {
-        padding: 60px 20px; text-align: center; color: #555;
-        font-size: 0.9rem; line-height: 2;
-    }
-    .game-area-placeholder strong { color: #aaa; }
+    @@keyframes popIn{from{opacity:0;transform:scale(0.92);}to{opacity:1;transform:scale(1);}}
+    .modal-icon{font-size:2.5rem;margin-bottom:12px;}
+    .modal-title{font-family:var(--fh);font-size:1.6rem;color:var(--white);letter-spacing:2px;margin-bottom:10px;}
+    .modal-msg{font-family:var(--fb);font-size:0.9rem;color:#888;line-height:1.6;margin-bottom:24px;}
+    .modal-msg strong{color:var(--white);}
+    .modal-actions{display:flex;gap:10px;}
+    .modal-btn{flex:1;padding:12px;border:none;border-radius:6px;font-family:var(--fb);font-size:0.88rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.2s;}
+    .modal-btn.cancel{background:#222;color:#888;border:1px solid var(--border);}
+    .modal-btn.cancel:hover{background:#2a2a2a;color:var(--white);}
+    .modal-btn.confirm{background:var(--red);color:white;}
+    .modal-btn.confirm:hover{background:#e8203d;transform:translateY(-1px);}
+
+    /* LAYOUT */
+    .layout{display:flex;margin-top:var(--tb);min-height:calc(100vh - var(--tb));background:var(--black);font-family:var(--fb);}
+
+    /* SIDEBAR */
+    .sidebar{width:var(--sb);flex-shrink:0;background:rgba(12,12,12,0.98);border-right:1px solid var(--border);padding:24px 0;position:sticky;top:var(--tb);height:calc(100vh - var(--tb));overflow-y:auto;}
+    .sb-title{font-size:0.7rem;letter-spacing:3px;color:var(--grey);padding:0 20px 12px;font-weight:700;}
+    .sb-item{display:flex;align-items:center;gap:12px;padding:12px 20px;color:#888;font-size:1rem;font-weight:500;transition:all 0.15s;border-left:3px solid transparent;}
+    .sb-item:hover{color:var(--white);background:rgba(255,255,255,0.04);}
+    .sb-item.active{color:var(--white);background:var(--red-dim);border-left-color:var(--red);}
+    .ro-tag{font-size:0.68rem;color:var(--gold);opacity:0.7;margin-left:4px;}
+    .expand{margin-left:auto;font-size:0.75rem;color:#444;transition:transform 0.2s;display:inline-block;}
+    .expand.open{transform:rotate(90deg);}
+    .sb-sub{padding:4px 0 4px 36px;}
+    .sb-sub-item{display:flex;align-items:center;gap:10px;padding:8px 14px;color:#777;font-size:0.88rem;border-radius:4px;transition:all 0.15s;}
+    .sb-sub-item:hover{color:var(--white);background:rgba(255,255,255,0.04);}
+    .sb-sub-item.active{color:var(--white);}
+    .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+    .dot.red{background:#e74c3c;box-shadow:0 0 7px #e74c3c;}
+    .dot.dark{background:#444;}
+    .dot.green{background:#27ae60;box-shadow:0 0 7px #27ae60;}
+
+    /* CONTENT */
+    .content{flex:1;padding:28px;overflow-y:auto;}
+    .promo-banner{background:linear-gradient(135deg,#1a0005 0%,#8B0000 50%,#C41E3A 100%);border-radius:12px;padding:32px 36px;display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;border:1px solid rgba(212,175,55,0.15);position:relative;overflow:hidden;}
+    .promo-banner::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(-45deg,transparent,transparent 20px,rgba(0,0,0,0.06) 20px,rgba(0,0,0,0.06) 21px);pointer-events:none;}
+    .promo-tag{font-size:0.7rem;letter-spacing:3px;color:var(--gold);font-weight:700;margin-bottom:8px;}
+    .promo-title{font-family:var(--fh);font-size:2.4rem;color:white;line-height:1.1;letter-spacing:1px;margin-bottom:18px;}
+    .promo-btn{background:var(--gold);color:#080808;border:none;padding:12px 28px;border-radius:4px;font-family:var(--fb);font-size:0.88rem;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;}
+    .promo-btn:hover{background:#e8c84a;transform:translateY(-1px);}
+    .promo-deco{font-size:6rem;opacity:0.25;line-height:1;}
+    .section-title{font-family:var(--fb);font-size:0.75rem;letter-spacing:3px;color:var(--grey);font-weight:700;margin-bottom:16px;}
+    .games-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
+    .game-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:22px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;}
+    .game-card:hover{border-color:var(--red);background:#1e1e1e;transform:translateY(-3px);box-shadow:0 10px 30px rgba(196,30,58,0.2);}
+    .game-card.selected{border-color:var(--gold);background:#1e1e1e;box-shadow:0 0 20px rgba(212,175,55,0.15);}
+    .gi{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin-bottom:14px;}
+    .gi.bj{background:rgba(196,30,58,0.15);} .gi.sl{background:rgba(212,175,55,0.12);}
+    .gi.cr{background:rgba(100,149,237,0.12);} .gi.ro{background:rgba(39,174,96,0.12);}
+    .gi.pk{background:rgba(155,89,182,0.12);} .gi.ba{background:rgba(52,152,219,0.12);}
+    .gi.wh{background:rgba(230,126,34,0.12);} .gi.sc{background:rgba(26,188,156,0.12);}
+    .gn{font-family:var(--fh);font-size:1.2rem;color:var(--white);letter-spacing:1px;margin-bottom:5px;}
+    .gd{font-size:0.8rem;color:#555;line-height:1.4;}
+    .gb{position:absolute;top:14px;right:14px;font-size:0.62rem;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:99px;}
+    .gb.hot{background:var(--red);color:white;} .gb.new{background:var(--gold);color:#080808;} .gb.live{background:#27ae60;color:white;}
+
+    /* ZONA JOC */
+    .game-area{background:var(--panel);border:1px solid rgba(212,175,55,0.15);border-radius:10px;overflow:hidden;animation:fadeUp 0.3s ease;scroll-margin-top:80px;position:relative;z-index:600;}
+    @@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+    .ga-title{padding:16px 22px;border-bottom:1px solid var(--border);font-family:var(--fh);font-size:1.2rem;letter-spacing:2px;color:var(--white);display:flex;justify-content:space-between;align-items:center;}
+    .ga-close{cursor:pointer;color:#444;transition:color 0.2s;font-size:1rem;}
+    .ga-close:hover{color:var(--red);}
+    .ga-placeholder{padding:300px 20px;text-align:center;color:#444;font-size:0.95rem;line-height:2.2;}
+    .ga-placeholder strong{color:#888;}
 </style>
+
+<!-- JavaScript pentru scroll si smooth scroll -->
+<script>
+    window.initScrollWatcher = function(dotnetRef) {
+        // Detecteaza scroll si anunta Blazor
+        window.addEventListener('scroll', function() {
+            var scrolled = window.scrollY > 80;
+            dotnetRef.invokeMethodAsync('OnScroll', scrolled);
+        });
+    };
+
+    window.scrollToElement = function(elementId) {
+        var el = document.getElementById(elementId);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+</script>
