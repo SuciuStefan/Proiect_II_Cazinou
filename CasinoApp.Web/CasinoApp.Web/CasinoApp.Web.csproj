@@ -14,7 +14,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <Folder Include="Components\Pages\Games\" />
 	  <Folder Include="Services\" />
+	  <Folder Include="wwwroot\images\" />
 	</ItemGroup>
 
 </Project>

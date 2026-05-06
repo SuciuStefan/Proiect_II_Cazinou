@@ -40,5 +40,5 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(CasinoApp.Web.Client._Imports).Assembly);
-
+app.UseStaticFiles();
 app.Run();

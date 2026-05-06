@@ -180,15 +180,23 @@
             @if (!string.IsNullOrEmpty(activeGame))
             {
                 <div class="game-area" id="game-area">
-                    <div class="ga-title">
-                        @GetGameTitle(activeGame)
-                        <span class="ga-close" @onclick="CloseGame">✕</span>
-                    </div>
+                <div class="ga-title">
+                @GetGameTitle(activeGame)
+                <span class="ga-close" @onclick="CloseGame">✕</span>
+                </div>
+
+                @if (activeGame == "scratch")
+                {
+                    <ScratchCard/>
+                }
+                else
+                {
                     <div class="ga-placeholder">
                         🚧 <strong>@GetGameTitle(activeGame)</strong> se construiește...<br/>
                         <span>Logica jocului va fi adăugată aici</span>
                     </div>
-                </div>
+                }
+            </div>
             }
         </main>
     </div>
@@ -228,7 +236,7 @@
     }
 
     // Incearca sa seteze jocul — daca e altul activ, cere confirmare
-    private void TrySetGame(string game)
+    private async void TrySetGame(string game)
     {
         if (!string.IsNullOrEmpty(activeGame) && activeGame != game)
         {
@@ -237,21 +245,20 @@
         }
         else
         {
-            SetGame(game);
+            await SetGame(game);
         }
     }
 
-    private async void SetGame(string game)
+    private async Task SetGame(string game)
     {
-        activeGame = game;
-        if (game.StartsWith("roulette")) showRoulette = true;
-        StateHasChanged();
-        // Scroll lin la sectiunea de joc
-        await Task.Delay(100); 
-        await JS.InvokeVoidAsync("scrollToElement", "game-area");
+    activeGame = game;
+    if (game.StartsWith("roulette")) showRoulette = true;
+    await InvokeAsync(StateHasChanged);
+    await Task.Delay(150);
+    await JS.InvokeVoidAsync("scrollToElement", "game-area");
     }
 
-    private void ConfirmSwitch()
+    private async void ConfirmSwitch()
     {
         showConfirm = false;
         SetGame(pendingGame);

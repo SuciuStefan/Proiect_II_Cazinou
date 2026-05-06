@@ -448,3 +448,5 @@ FodyWeavers.xsd
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/CasinoApp.API/casino.db
+/CasinoApp.Web/CasinoApp.Web/casino.db
