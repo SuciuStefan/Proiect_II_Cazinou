@@ -165,6 +165,23 @@ namespace CasinoApp.DataAccess.DB_operations
 
             command.ExecuteNonQuery();
         }
+        public void UpdatePassword(int playerId, string newPassword)
+        {
+            using var connection = DbManager.GetConnection();
+            connection.Open();
+
+            var command = connection.CreateCommand();
+            command.CommandText = @"
+        UPDATE Players
+        SET Password = $password
+        WHERE Id = $playerId;
+    ";
+
+            command.Parameters.AddWithValue("$password", newPassword);
+            command.Parameters.AddWithValue("$playerId", playerId);
+
+            command.ExecuteNonQuery();
+        }
 
         public void UpdateBalance(int playerId, double newBalance)
         {
