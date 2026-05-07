@@ -30,15 +30,18 @@
 
                 <div class="field-group">
                     <label>Nume utilizator</label>
-                    <input type="text" @bind="regUsername" placeholder="ex: LuckyAce99" />
+                    <!--Marcus-->
+                    <input type="text" @bind="regUsername" maxlength="18" placeholder="ex: LuckyAce99" />
                 </div>
                 <div class="field-group">
                     <label>Email</label>
-                    <input type="email" @bind="regEmail" placeholder="email@exemplu.com" />
+                    <!--Marcus-->
+                    <input type="email" @bind="regEmail" maxlength="56" placeholder="email@exemplu.com" />
                 </div>
                 <div class="field-group">
                     <label>Parolă</label>
-                    <input type="password" @bind="regPassword" placeholder="••••••••" />
+                    <!--Marcus-->
+                    <input type="password" @bind="regPassword" maxlength="18" placeholder="••••••••" />
                 </div>
 
                 @if (!string.IsNullOrEmpty(regMessage))
@@ -58,11 +61,13 @@
 
                 <div class="field-group">
                     <label>Utilizator</label>
-                    <input type="text" @bind="loginUsername" placeholder="Utilizatorul tău..." />
+                    <!--Marcus-->
+                    <input type="text" @bind="loginUsername" maxlength="18" placeholder="Utilizatorul tău..." />
                 </div>
                 <div class="field-group">
                     <label>Parolă</label>
-                    <input type="password" @bind="loginPassword" placeholder="••••••••" />
+                    <!--Marcus-->
+                    <input type="password" @bind="loginPassword" maxlength="18" placeholder="••••••••" />
                 </div>
 
                 <a class="forgot-link" href="#">Ai uitat parola?</a>
@@ -152,6 +157,13 @@
             regMessage = "Completează toate câmpurile!";
             return;
         }
+        //Marcus
+        if (regUsername.Length > 18)
+        {
+            regSuccess = false;
+            regMessage = "Username-ul poate avea maxim 18 caractere.";
+            return;
+        }
 
         if (regPassword.Length < 6)
         {
@@ -159,26 +171,58 @@
             regMessage = "Parola trebuie să aibă minim 6 caractere.";
             return;
         }
+        //Marcus
+        if (regPassword.Length > 18)
+        {
+            regSuccess = false;
+            regMessage = "Parola poate avea maxim 18 caractere.";
+            return;
+        }
 
         var existing = PlayerRepo.GetByUsername(regUsername);
         if (existing != null)
         {
             regSuccess = false;
-            regMessage = "Username-ul există deja!";
+            //Marcus
+            regMessage = "Acest username este deja utilizat!";
             return;
         }
-
-        PlayerRepo.Create(new CasinoApp.DataAccess.Entities.Player
+        //Marcus
+        var existingEmail = PlayerRepo.GetByEmail(regEmail); 
+        if (existingEmail != null)
         {
-            Username  = regUsername,
-            Email     = regEmail,
-            Password  = regPassword,
-            Balance   = 500.00 // bonus de bun venit
-        });
+            regSuccess = false;
+            regMessage = "Acest email este deja utilizat!";
+            return;
+        }
+        //Marcus
+        var welcomeBonus = 500; // bonus de bun venit
+        //Marcus
+        try
+        {
+            PlayerRepo.Create(new CasinoApp.DataAccess.Entities.Player
+                {
+                    Username = regUsername,
+                    Email = regEmail,
+                    Password = regPassword,
+                //Marcus
+                    Balance = welcomeBonus // bonus de bun venit
+                });
 
-        regSuccess = true;
-        regMessage = "Cont creat cu 500 RON bonus! Te poți autentifica.";
+            regSuccess = true;
+            //Marcus
+            regMessage = $"Cont creat cu {welcomeBonus} RON bonus! Te poți autentifica.";
+        }
+        catch (Exception ex)
+    {
+        regSuccess = false;
+        regMessage = "A apărut o eroare la salvarea datelor.";
     }
+    //Cica e bun acest catch in caz ca undeva cumva ar da 2 useri creare cont cu acelasi nume sau email,
+    //exact in acelasi timp, sa nu puste, da eroarea aia. Nu stiu daca e neaparat nevoie, dar am pus, se
+    //poate scoate daca incurca.
+    }
+
 }
 
 
