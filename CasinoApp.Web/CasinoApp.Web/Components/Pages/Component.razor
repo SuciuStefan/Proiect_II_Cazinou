@@ -1,0 +1,58 @@
+﻿@page "/ResetPassword/{Token}"
+@rendermode InteractiveServer
+@using CasinoApp.DataAccess.DB_operations
+@inject NavigationManager NavManager
+
+<h3>Setează parola nouă</h3>
+
+<input type="password" @bind="newPassword" placeholder="Parola nouă" />
+<input type="password" @bind="confirmPassword" placeholder="Confirmă parola" />
+
+<button @onclick="ResetPasswordNow">Resetează parola</button>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p>@message</p>
+}
+
+@code {
+    [Parameter]
+    public string Token { get; set; } = string.Empty;
+
+    private string newPassword = string.Empty;
+    private string confirmPassword = string.Empty;
+    private string message = string.Empty;
+
+    private PasswordResetTokenRepository TokenRepo = new();
+    private PlayerRepository PlayerRepo = new();
+
+    private void ResetPasswordNow()
+    {
+        if (string.IsNullOrWhiteSpace(newPassword))
+        {
+            message = "Introdu parola nouă.";
+            return;
+        }
+
+        if (newPassword != confirmPassword)
+        {
+            message = "Parolele nu coincid.";
+            return;
+        }
+
+        var tokenData = TokenRepo.GetValidToken(Token);
+
+        if (tokenData == null)
+        {
+            message = "Link invalid sau expirat.";
+            return;
+        }
+
+        PlayerRepo.UpdatePassword(tokenData.Value.PlayerId, newPassword);
+        TokenRepo.MarkAsUsed(Token);
+
+        message = "Parola a fost resetată cu succes.";
+
+        NavManager.NavigateTo("/");
+    }
+}

@@ -7,6 +7,7 @@ using CasinoApp.Web.Services;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<PlayerRepository>();
 builder.Services.AddScoped<SessionService>();
+builder.Services.AddScoped<EmailService>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()

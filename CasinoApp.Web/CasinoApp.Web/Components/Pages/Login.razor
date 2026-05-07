@@ -70,7 +70,10 @@
                     <input type="password" @bind="loginPassword" maxlength="18" placeholder="••••••••" />
                 </div>
 
-                <a class="forgot-link" href="#">Ai uitat parola?</a>
+                <a class="forgot-link"
+   @onclick="GoToForgotPassword">
+   Ai uitat parola?
+</a>
 
                 @if (!string.IsNullOrEmpty(loginMessage))
                 {
@@ -222,6 +225,12 @@
     //exact in acelasi timp, sa nu puste, da eroarea aia. Nu stiu daca e neaparat nevoie, dar am pus, se
     //poate scoate daca incurca.
     }
+    
+
+private void GoToForgotPassword()
+{
+    NavManager.NavigateTo("/ForgotPassword");
+}
 
 }
 
