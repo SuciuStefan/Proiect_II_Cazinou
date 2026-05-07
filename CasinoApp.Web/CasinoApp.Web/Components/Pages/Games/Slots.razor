@@ -316,7 +316,9 @@ window.slotsGame = (function() {
         reelStopped = new bool[] { false, false, false };
 
         // Scade pariul
-        Session.CurrentPlayer.Balance -= betAmount;
+        var newBalanceAfterBet = Session.CurrentPlayer.Balance - betAmount;
+        Session.UpdateBalance(newBalanceAfterBet); 
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalanceAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, Session.CurrentPlayer.Balance);
 
         // Genereaza rezultatul
@@ -417,7 +419,9 @@ window.slotsGame = (function() {
 
         if (totalWin > 0)
         {
-            Session.CurrentPlayer!.Balance += totalWin;
+            var newBalanceAfterWin = Session.CurrentPlayer.Balance + totalWin;
+            Session.UpdateBalance(newBalanceAfterWin);
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalanceAfterWin);
             PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, Session.CurrentPlayer.Balance);
         }
     }
