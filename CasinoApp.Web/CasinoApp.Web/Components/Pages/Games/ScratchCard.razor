@@ -285,7 +285,8 @@ window.scratchCardGame = (function () {
         img.onload = function() {
             var size = 80;
             var tmp  = document.createElement('canvas');
-            tmp.width = size; tmp.height = size;
+            tmp.width = size;
+            tmp.height = size;
             var tctx = tmp.getContext('2d');
             tctx.drawImage(img, 0, 0, size, size);
 
