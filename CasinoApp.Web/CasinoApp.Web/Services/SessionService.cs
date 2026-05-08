@@ -18,9 +18,7 @@ namespace CasinoApp.Web.Services
 
         public void UpdateBalance(double newBalance)
         {
-            if (CurrentPlayer == null)
-                return;
-
+            if (CurrentPlayer != null)
             CurrentPlayer.Balance = newBalance;
             NotifyStateChanged();
         }

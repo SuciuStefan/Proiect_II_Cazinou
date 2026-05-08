@@ -194,8 +194,15 @@
                 {
                      <Slots/>
                 }
-                else
+                else if(activeGame =="blackjack")
                 {
+                    <Blackjack/>
+                }
+                else if(activeGame.StartsWith("roulette"))
+                {
+                     <Roulette/>
+                }else
+                    {
                     <div class="ga-placeholder">
                         🚧 <strong>@GetGameTitle(activeGame)</strong> se construiește...<br/>
                         <span>Logica jocului va fi adăugată aici</span>

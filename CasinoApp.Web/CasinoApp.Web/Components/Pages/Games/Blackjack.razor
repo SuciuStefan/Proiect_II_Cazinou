@@ -1,0 +1,571 @@
+@using CasinoApp.DataAccess.DB_operations
+@inject CasinoApp.Web.Services.SessionService Session
+@inject PlayerRepository PlayerRepo
+@implements IDisposable
+
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
+
+<div class="bj-table">
+
+    @* ── DEALER ─────────────────────────────────────────────────────────── *@
+    <div class="bj-zone dealer-zone">
+        <div class="bj-zone-label">DEALER</div>
+        <div class="bj-hand">
+            @for (int i = 0; i < dealerHand.Count; i++)
+            {
+                int ci = i;
+                bool hide = ci == 1 && gameState == GameState.Playing;
+                <div class="bj-card @(GetColorClass(dealerHand[ci])) @(hide ? "card-back" : "")"
+                     style="--di:@ci">
+                    @if (!hide)
+                    {
+                        <span class="cr">@dealerHand[ci].Rank</span>
+                        <span class="cs-tl">@dealerHand[ci].Suit</span>
+                        <span class="cs-c">@dealerHand[ci].Suit</span>
+                        <span class="cs-br">@dealerHand[ci].Suit</span>
+                    }
+                    else
+                    {
+                        <span class="cbp">♦♠♥♣</span>
+                    }
+                </div>
+            }
+        </div>
+        @if (dealerHand.Count > 0)
+        {
+            <div class="bj-score">
+                @if (gameState == GameState.Playing)
+                { @(GetHandValue(new List<Card>{ dealerHand[0] })) <span style="color:#555">+ ?</span> }
+                else
+                { @GetHandValue(dealerHand) }
+            </div>
+        }
+    </div>
+
+    @* ── LINIE MASA ──────────────────────────────────────────────────────── *@
+    <div class="bj-table-line">
+        <span class="bj-table-text">BLACKJACK PAYS 3:2 &nbsp;·&nbsp; DEALER MUST DRAW TO 16 &nbsp;·&nbsp; STAND ON 17</span>
+    </div>
+
+    @* ── BANNER REZULTAT ─────────────────────────────────────────────────── *@
+    @if (gameState == GameState.Result)
+    {
+        <div class="bj-result @GetResultClass()">
+            <span class="res-msg">@resultMsg</span>
+            @if (resultWin != 0)
+            {
+                <span class="res-amt">@(resultWin > 0 ? "+" : "")@resultWin.ToString("F2") RON</span>
+            }
+        </div>
+    }
+
+    @* ── PLAYER ──────────────────────────────────────────────────────────── *@
+    <div class="bj-zone player-zone">
+        <div class="bj-hand">
+            @for (int i = 0; i < playerHand.Count; i++)
+            {
+                int ci = i;
+                <div class="bj-card @(GetColorClass(playerHand[ci]))"
+                     style="--di:@(ci + 10)">
+                    <span class="cr">@playerHand[ci].Rank</span>
+                    <span class="cs-tl">@playerHand[ci].Suit</span>
+                    <span class="cs-c">@playerHand[ci].Suit</span>
+                    <span class="cs-br">@playerHand[ci].Suit</span>
+                </div>
+            }
+        </div>
+        @if (playerHand.Count > 0)
+        {
+            int pv = GetHandValue(playerHand);
+            <div class="bj-score @(pv > 21 ? "score-bust" : "")">
+                @pv @(pv > 21 ? "— BUST" : "")
+            </div>
+        }
+
+        @* Stiva jetoane + butoane actiune *@
+        <div class="bj-bet-area">
+            <div class="bj-chip-stack">
+                @if (currentBet == 0)
+                {
+                    <div class="bet-empty">Plasează pariul</div>
+                }
+                else
+                {
+                    @foreach (var v in GetChipStack(currentBet))
+                    {
+                        <div class="stacked-chip chip-@v">@v</div>
+                    }
+                    <div class="bet-total">@currentBet RON</div>
+                }
+            </div>
+
+            @if (gameState == GameState.Playing)
+            {
+                <div class="bj-actions">
+                    <button class="bj-btn hit"    @onclick="Hit">HIT</button>
+                    <button class="bj-btn stand"  @onclick="Stand">STAND</button>
+                    <button class="bj-btn dbl @(!CanDouble() ? "off" : "")"
+                            @onclick="DoubleDown" disabled="@(!CanDouble())">2×</button>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ── PANEL PARIURI ───────────────────────────────────────────────────── *@
+    @if (gameState == GameState.Betting || gameState == GameState.Result)
+    {
+        <div class="bj-bet-panel">
+
+            <div class="bj-chips-row">
+                @foreach (var cv in chipDenoms)
+                {
+                    int c = cv;
+                    bool ok = Session.CurrentPlayer!.Balance >= c;
+                    <button class="bj-chip chip-@c @(!ok ? "chip-off" : "")"
+                            @onclick="() => AddChip(c)" disabled="@(!ok)">
+                        <span class="chi">@c</span>
+                        <span class="chcur">RON</span>
+                    </button>
+                }
+            </div>
+
+            <div class="bj-bet-controls">
+                <button class="bj-ctrl clear" @onclick="ClearBet" disabled="@(currentBet == 0)">✕ STERGE</button>
+                <button class="bj-ctrl rebet" @onclick="Rebet"
+                        disabled="@(lastBet == 0 || Session.CurrentPlayer!.Balance < lastBet)">
+                    ↺ REBET (@lastBet RON)
+                </button>
+                <button class="bj-deal @(currentBet == 0 ? "deal-off" : "")"
+                        @onclick="Deal" disabled="@(currentBet == 0)">
+                    DEAL
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMsg))
+            {
+                <div class="bj-error">@errorMsg</div>
+            }
+
+        </div>
+    }
+
+    @* ── BALANTA + TABLA PLATI ───────────────────────────────────────────── *@
+    <div class="bj-bottom">
+        <div class="bj-paytable">
+            @foreach (var s in chipDenoms)
+            { }
+            <span class="pt-item">BJ → 3:2</span>
+            <span class="pt-sep">·</span>
+            <span class="pt-item">WIN → 1:1</span>
+            <span class="pt-sep">·</span>
+            <span class="pt-item">PUSH → bet back</span>
+        </div>
+        <div class="bj-bal">
+            <span class="bj-bal-lbl">BALANȚĂ</span>
+            <span class="bj-bal-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
+        </div>
+    </div>
+
+</div>
+
+@code {
+
+    // ── Tipuri ────────────────────────────────────────────────────────────
+    private record Card(string Rank, string Suit, int Value);
+    private enum GameState { Betting, Playing, Result }
+
+    // ── Stare joc ─────────────────────────────────────────────────────────
+    private GameState   gameState  = GameState.Betting;
+    private List<Card>  deck       = new();
+    private List<Card>  playerHand = new();
+    private List<Card>  dealerHand = new();
+
+    // ── Pariu ─────────────────────────────────────────────────────────────
+    private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
+    private int    currentBet = 0;
+    private int    lastBet    = 0;
+
+    // ── Rezultat ──────────────────────────────────────────────────────────
+    private string errorMsg   = "";
+    private string resultMsg  = "";
+    private double resultWin  = 0;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────
+    protected override void OnInitialized()
+    {
+        Session.OnChange += OnSessionChanged;
+    }
+
+    private void OnSessionChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Session.OnChange -= OnSessionChanged;
+    }
+
+    // ── Jetoane ───────────────────────────────────────────────────────────
+    private void AddChip(int v)
+    {
+        if (Session.CurrentPlayer!.Balance < currentBet + v)
+        {
+            errorMsg = "Balanță insuficientă!";
+            return;
+        }
+        errorMsg = "";
+        currentBet += v;
+    }
+
+    private void ClearBet() { currentBet = 0; errorMsg = ""; }
+
+    private void Rebet()
+    {
+        if (Session.CurrentPlayer!.Balance < lastBet) return;
+        currentBet = lastBet;
+        errorMsg   = "";
+    }
+
+    // ── DEAL ──────────────────────────────────────────────────────────────
+    private void Deal()
+    {
+        if (currentBet == 0 || Session.CurrentPlayer!.Balance < currentBet) return;
+
+        // Scade pariul
+        var balAfterBet = Session.CurrentPlayer.Balance - currentBet;
+        Session.UpdateBalance(balAfterBet);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
+
+        errorMsg = "";
+        BuildDeck();
+        playerHand = new(); dealerHand = new();
+
+        playerHand.Add(Draw()); dealerHand.Add(Draw());
+        playerHand.Add(Draw()); dealerHand.Add(Draw());
+
+        gameState = GameState.Playing;
+
+        if (GetHandValue(playerHand) == 21) EndGame();
+    }
+
+    // ── HIT ───────────────────────────────────────────────────────────────
+    private void Hit()
+    {
+        playerHand.Add(Draw());
+        if (GetHandValue(playerHand) >= 21) EndGame();
+    }
+
+    // ── STAND ─────────────────────────────────────────────────────────────
+    private void Stand() => DealerPlay();
+
+    // ── DOUBLE DOWN ───────────────────────────────────────────────────────
+    private bool CanDouble() =>
+        playerHand.Count == 2 && Session.CurrentPlayer!.Balance >= currentBet;
+
+    private void DoubleDown()
+    {
+        if (!CanDouble()) return;
+
+        // Scade inca un pariu
+        var balAfterDouble = Session.CurrentPlayer!.Balance - currentBet;
+        Session.UpdateBalance(balAfterDouble);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterDouble);
+
+        currentBet *= 2;
+        playerHand.Add(Draw());
+
+        if (GetHandValue(playerHand) > 21) EndGame();
+        else DealerPlay();
+    }
+
+    // ── DEALER JOACA ─────────────────────────────────────────────────────
+    private void DealerPlay()
+    {
+        while (GetHandValue(dealerHand) < 17)
+            dealerHand.Add(Draw());
+        EndGame();
+    }
+
+    // ── CALCUL REZULTAT ───────────────────────────────────────────────────
+    private void EndGame()
+    {
+        int  pv       = GetHandValue(playerHand);
+        int  dv       = GetHandValue(dealerHand);
+        bool playerBJ = pv == 21 && playerHand.Count == 2;
+        bool dealerBJ = dv == 21 && dealerHand.Count == 2;
+
+        resultWin = 0;
+        double currentBalance = Session.CurrentPlayer!.Balance;
+        double newBalance;
+
+        if (pv > 21)
+        {
+            // Bust — banii deja scazuti la deal
+            resultMsg = "BUST — AI PIERDUT";
+            resultWin = -currentBet;
+            newBalance = currentBalance; // nu mai schimbam nimic
+        }
+        else if (dealerBJ && !playerBJ)
+        {
+            resultMsg = "DEALER BLACKJACK";
+            resultWin = -currentBet;
+            newBalance = currentBalance;
+        }
+        else if (playerBJ && !dealerBJ)
+        {
+            // BJ plateste 3:2 → primesti inapoi pariul + 1.5x
+            double winAmt = currentBet * 1.5;
+            resultMsg  = "✦ BLACKJACK! ✦";
+            resultWin  = winAmt;
+            newBalance = currentBalance + currentBet + winAmt;
+            Session.UpdateBalance(newBalance);
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
+        }
+        else if (dv > 21)
+        {
+            resultMsg  = "DEALER BUST — AI CÂȘTIGAT!";
+            resultWin  = currentBet;
+            newBalance = currentBalance + currentBet * 2;
+            Session.UpdateBalance(newBalance);
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
+        }
+        else if (pv > dv)
+        {
+            resultMsg  = "AI CÂȘTIGAT!";
+            resultWin  = currentBet;
+            newBalance = currentBalance + currentBet * 2;
+            Session.UpdateBalance(newBalance);
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
+        }
+        else if (pv == dv)
+        {
+            // Push — returneaza pariul
+            resultMsg  = "EGALITATE — PUSH";
+            resultWin  = 0;
+            newBalance = currentBalance + currentBet;
+            Session.UpdateBalance(newBalance);
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
+        }
+        else
+        {
+            resultMsg  = "DEALER CÂȘTIGĂ";
+            resultWin  = -currentBet;
+            newBalance = currentBalance;
+        }
+
+        lastBet   = currentBet;
+        gameState = GameState.Result;
+    }
+
+    // ── DECK ─────────────────────────────────────────────────────────────
+    private void BuildDeck()
+    {
+        deck = new();
+        var suits = new[] { "♠","♥","♦","♣" };
+        var ranks = new (string R, int V)[]
+        {
+            ("A",1),("2",2),("3",3),("4",4),("5",5),
+            ("6",6),("7",7),("8",8),("9",9),("10",10),
+            ("J",10),("Q",10),("K",10)
+        };
+        // 6 pachete ca la cazino real
+        for (int d = 0; d < 6; d++)
+            foreach (var s in suits)
+                foreach (var r in ranks)
+                    deck.Add(new Card(r.R, s, r.V));
+
+        var rng = new Random();
+        deck = deck.OrderBy(_ => rng.Next()).ToList();
+    }
+
+    private Card Draw()
+    {
+        var c = deck[^1];
+        deck.RemoveAt(deck.Count - 1);
+        return c;
+    }
+
+    private int GetHandValue(List<Card> hand)
+    {
+        int total = 0, aces = 0;
+        foreach (var c in hand)
+        {
+            if (c.Rank == "A") { aces++; total += 11; }
+            else total += c.Value;
+        }
+        while (total > 21 && aces > 0) { total -= 10; aces--; }
+        return total;
+    }
+
+    private string GetColorClass(Card c) =>
+        c.Suit is "♥" or "♦" ? "card-red" : "card-black";
+
+    private string GetResultClass() => resultMsg switch
+    {
+        var m when m.Contains("BLACKJACK") && m.Contains("✦") => "res-bj",
+        var m when m.Contains("CÂȘTIGAT")  => "res-win",
+        var m when m.Contains("EGALITATE") => "res-push",
+        _                                  => "res-lose"
+    };
+
+    private List<int> GetChipStack(int amount)
+    {
+        var result = new List<int>();
+        foreach (var d in new[] { 100,50,25,10,5,1 })
+            while (amount >= d && result.Count < 8) { result.Add(d); amount -= d; }
+        return result;
+    }
+}
+
+<style>
+    /* ── MASA ────────────────────────────────────────────────────────────── */
+    .bj-table {
+        position: relative;
+        display: flex; flex-direction: column; align-items: center; gap: 0;
+        min-height: 620px; padding: 28px 24px 32px;
+        font-family: 'Rajdhani', sans-serif; color: #f0e6d3;
+        background: radial-gradient(ellipse 90% 60% at 50% 40%, #0a2e0a 0%, #071a07 60%, #040d04 100%);
+        border-radius: 0 0 8px 8px; overflow: hidden;
+    }
+    .bj-table::before {
+        content: ''; position: absolute; inset: 0; pointer-events: none;
+        background-image:
+            repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.008) 40px, rgba(255,255,255,0.008) 41px),
+            repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(255,255,255,0.008) 40px, rgba(255,255,255,0.008) 41px);
+    }
+
+    /* ── ZONE ────────────────────────────────────────────────────────────── */
+    .bj-zone { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+    .dealer-zone { padding-bottom: 12px; }
+    .player-zone { padding-top: 12px; }
+    .bj-zone-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.8rem; letter-spacing: 4px; color: rgba(212,175,55,0.4); }
+    .bj-table-line { width: 80%; max-width: 560px; border-top: 1px solid rgba(212,175,55,0.2); border-bottom: 1px solid rgba(212,175,55,0.2); padding: 7px 0; text-align: center; margin: 8px 0; }
+    .bj-table-text { font-size: 0.62rem; letter-spacing: 2px; color: rgba(212,175,55,0.35); font-weight: 700; }
+
+    /* ── MAINI ───────────────────────────────────────────────────────────── */
+    .bj-hand { display: flex; justify-content: center; min-height: 120px; align-items: center; }
+
+    /* ── CARTE ───────────────────────────────────────────────────────────── */
+    .bj-card {
+        position: relative; width: 72px; height: 104px;
+        background: #fafafa; border-radius: 8px;
+        box-shadow: 2px 4px 16px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.1);
+        margin-left: -14px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        border: 1px solid rgba(0,0,0,0.1);
+        animation: cardIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+        animation-delay: calc(var(--di, 0) * 120ms);
+    }
+    .bj-card:first-child { margin-left: 0; }
+    @@keyframes cardIn {
+        from { transform: translateY(-60px) rotate(-8deg) scale(0.85); opacity: 0; }
+        to   { transform: translateY(0) rotate(0) scale(1); opacity: 1; }
+    }
+    .cr   { position: absolute; top: 5px; left: 7px; font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 900; line-height: 1; }
+    .cs-tl{ position: absolute; top: 20px; left: 7px; font-size: 0.75rem; line-height: 1; }
+    .cs-c { font-size: 2rem; line-height: 1; }
+    .cs-br{ position: absolute; bottom: 7px; right: 7px; font-size: 0.75rem; transform: rotate(180deg); line-height: 1; }
+    .card-red   { color: #c0392b; }
+    .card-black { color: #1a1a1a; }
+    .card-back  { background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 50%, #1a0a2e 100%); }
+    .cbp { font-size: 0.55rem; letter-spacing: 1px; color: rgba(212,175,55,0.3); writing-mode: vertical-rl; user-select: none; }
+
+    /* ── SCOR ────────────────────────────────────────────────────────────── */
+    .bj-score { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 2px; padding: 4px 14px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 99px; color: #f0e6d3; }
+    .score-bust { color: #e74c3c; border-color: rgba(231,76,60,0.4); }
+
+    /* ── BANNER REZULTAT ─────────────────────────────────────────────────── */
+    .bj-result { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 36px; border-radius: 8px; margin: 6px 0; animation: resPop 0.4s cubic-bezier(0.22,1,0.36,1); }
+    @@keyframes resPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .res-msg { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 4px; }
+    .res-amt { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 2px; }
+    .res-bj   { background: rgba(212,175,55,0.15); border: 1px solid rgba(212,175,55,0.5); color: #D4AF37; }
+    .res-win  { background: rgba(39,174,96,0.12);  border: 1px solid rgba(39,174,96,0.4);  color: #2ecc71; }
+    .res-push { background: rgba(255,255,255,0.06);border: 1px solid rgba(255,255,255,0.15);color: #888; }
+    .res-lose { background: rgba(196,30,58,0.12);  border: 1px solid rgba(196,30,58,0.35); color: #e74c3c; }
+
+    /* ── ZONA PARIU ──────────────────────────────────────────────────────── */
+    .bj-bet-area { display: flex; align-items: center; gap: 24px; margin-top: 8px; }
+    .bj-chip-stack { display: flex; flex-direction: column-reverse; align-items: center; min-width: 70px; min-height: 50px; justify-content: flex-end; }
+    .bet-empty { font-size: 0.72rem; letter-spacing: 1.5px; color: rgba(212,175,55,0.2); white-space: nowrap; border: 1px dashed rgba(212,175,55,0.15); padding: 6px 12px; border-radius: 6px; }
+    .stacked-chip { width: 52px; height: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 0.65rem; letter-spacing: 1px; margin-top: -4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); animation: chipIn 0.15s ease; }
+    @@keyframes chipIn { from { transform: translateY(-10px) scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
+    .bet-total { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; color: #D4AF37; margin-top: 4px; letter-spacing: 1px; }
+
+    /* Culori jetoane stivuite */
+    .chip-1   { background: linear-gradient(180deg,#aaa,#888); color:#fff; border:1px solid #666; }
+    .chip-5   { background: linear-gradient(180deg,#e74c3c,#c0392b); color:#fff; border:1px solid #922b21; }
+    .chip-10  { background: linear-gradient(180deg,#3498db,#2980b9); color:#fff; border:1px solid #1a5276; }
+    .chip-25  { background: linear-gradient(180deg,#27ae60,#1e8449); color:#fff; border:1px solid #145a32; }
+    .chip-50  { background: linear-gradient(180deg,#e67e22,#d35400); color:#fff; border:1px solid #a04000; }
+    .chip-100 { background: linear-gradient(180deg,#8e44ad,#6c3483); color:#fff; border:1px solid #4a235a; }
+
+    /* Butoane HIT / STAND / 2x */
+    .bj-actions { display: flex; flex-direction: column; gap: 8px; }
+    .bj-btn { padding: 10px 22px; border: none; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 3px; cursor: pointer; transition: all 0.15s; min-width: 90px; }
+    .bj-btn.hit   { background: linear-gradient(135deg,#27ae60,#1e8449); color: white; box-shadow: 0 4px 12px rgba(39,174,96,0.4); }
+    .bj-btn.hit:hover { background: linear-gradient(135deg,#2ecc71,#27ae60); transform: translateY(-2px); }
+    .bj-btn.stand { background: linear-gradient(135deg,#c0392b,#922b21); color: white; box-shadow: 0 4px 12px rgba(192,57,43,0.4); }
+    .bj-btn.stand:hover { background: linear-gradient(135deg,#e74c3c,#c0392b); transform: translateY(-2px); }
+    .bj-btn.dbl   { background: linear-gradient(135deg,#d35400,#a04000); color: white; box-shadow: 0 4px 12px rgba(211,84,0,0.4); font-size: 1rem; }
+    .bj-btn.dbl:hover:not(.off) { background: linear-gradient(135deg,#e67e22,#d35400); transform: translateY(-2px); }
+    .bj-btn.dbl.off { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+    /* ── PANEL PARIURI ───────────────────────────────────────────────────── */
+    .bj-bet-panel { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; max-width: 560px; padding: 18px 20px; background: rgba(0,0,0,0.25); border: 1px solid rgba(212,175,55,0.1); border-radius: 10px; margin-top: 8px; }
+    .bj-chips-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+    /* Jetoane mari de selectat */
+    .bj-chip {
+        width: 58px; height: 58px; border-radius: 50%; border: none; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        transition: all 0.15s; position: relative; overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .bj-chip::before { content:''; position:absolute; inset:4px; border-radius:50%; border:2px dashed rgba(255,255,255,0.25); }
+    .bj-chip:hover:not(.chip-off) { transform: translateY(-4px) scale(1.08); box-shadow: 0 8px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2); }
+    .bj-chip:active:not(.chip-off) { transform: scale(0.97); }
+    .bj-chip.chip-off { opacity: 0.3; cursor: not-allowed; }
+    .chi    { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 1px; color: white; line-height: 1; }
+    .chcur  { font-size: 0.55rem; letter-spacing: 1px; color: rgba(255,255,255,0.7); line-height: 1; }
+
+    /* Aceleasi culori pentru jetoanele mari */
+    .bj-chip.chip-1   { background: linear-gradient(160deg,#bbb,#888); }
+    .bj-chip.chip-5   { background: linear-gradient(160deg,#e74c3c,#c0392b); }
+    .bj-chip.chip-10  { background: linear-gradient(160deg,#3498db,#2980b9); }
+    .bj-chip.chip-25  { background: linear-gradient(160deg,#27ae60,#1e8449); }
+    .bj-chip.chip-50  { background: linear-gradient(160deg,#e67e22,#d35400); }
+    .bj-chip.chip-100 { background: linear-gradient(160deg,#9b59b6,#6c3483); }
+
+    /* Controale bet */
+    .bj-bet-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+    .bj-ctrl { padding: 8px 18px; background: transparent; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; font-family: 'Rajdhani', sans-serif; font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px; color: #666; cursor: pointer; transition: all 0.2s; }
+    .bj-ctrl:hover:not(:disabled) { border-color: rgba(255,255,255,0.3); color: #f0e6d3; background: rgba(255,255,255,0.05); }
+    .bj-ctrl:disabled { opacity: 0.3; cursor: not-allowed; }
+    .bj-ctrl.clear:hover:not(:disabled) { border-color: rgba(231,76,60,0.5); color: #e74c3c; }
+    .bj-ctrl.rebet:hover:not(:disabled) { border-color: rgba(212,175,55,0.5); color: #D4AF37; }
+
+    /* Buton DEAL */
+    .bj-deal { padding: 12px 44px; background: linear-gradient(135deg,#D4AF37 0%,#b8960c 100%); color: #080808; border: none; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 4px; cursor: pointer; transition: all 0.2s; box-shadow: 0 6px 20px rgba(212,175,55,0.4), 0 2px 0 #8a6900; }
+    .bj-deal:hover:not(.deal-off) { background: linear-gradient(135deg,#e8c84a 0%,#D4AF37 100%); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(212,175,55,0.6), 0 2px 0 #8a6900; }
+    .bj-deal.deal-off { opacity: 0.3; cursor: not-allowed; transform: none; background: #333; box-shadow: none; }
+
+    .bj-error { color: #e74c3c; font-size: 0.8rem; letter-spacing: 0.5px; }
+
+    /* ── BOTTOM ───────────────────────────────────────────────────────────── */
+    .bj-bottom { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 14px; }
+    .bj-paytable { display: flex; gap: 8px; align-items: center; }
+    .pt-item { font-size: 0.65rem; letter-spacing: 1.5px; color: rgba(212,175,55,0.3); font-weight: 700; }
+    .pt-sep  { color: rgba(212,175,55,0.15); }
+    .bj-bal  { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .bj-bal-lbl { font-size: 0.62rem; letter-spacing: 3px; color: #444; font-weight: 700; }
+    .bj-bal-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: #D4AF37; letter-spacing: 2px; }
+
+    @@media (max-width: 520px) {
+        .bj-card { width: 58px; height: 86px; }
+        .cs-c { font-size: 1.5rem; }
+        .bj-chip { width: 48px; height: 48px; }
+        .chi { font-size: 1rem; }
+    }
+</style>
