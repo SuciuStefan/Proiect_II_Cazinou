@@ -1,95 +1,136 @@
 @using CasinoApp.DataAccess.DB_operations
 @inject CasinoApp.Web.Services.SessionService Session
 @inject PlayerRepository PlayerRepo
-@inject IJSRuntime JS
 @implements IDisposable
 
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
 
 <div class="rl-wrapper">
 
-    @* ── ROATA + REZULTAT ────────────────────────────────────────────────── *@
     <div class="rl-top-section">
 
-        @* ROATA *@
-        <div class="rl-wheel-container">
-            <div class="rl-wheel" id="rl-wheel">
-                @* Segmente colorate *@
-                <div class="rl-wheel-inner">
-                    @for (int i = 0; i < wheelOrder.Length; i++)
+        @* ── ROATA ─── *@
+        <div class="rl-wheel-wrap">
+            <div class="rl-indicator">▼</div>
+
+            @* Container fix *@
+            <div class="rl-wheel-outer">
+
+                @* 🟢 CALCULĂRILE C# (O singură dată) *@
+                @{
+                    var cgParts = new List<string>();
+                    double seg = 360.0 / wheelOrder.Length;
+                    for (int i = 0; i < wheelOrder.Length; i++)
                     {
-                        int n = wheelOrder[i];
-                        double angle = i * (360.0 / wheelOrder.Length);
-                        <div class="rl-seg @(n == 0 ? "seg-green" : IsRed(n) ? "seg-red" : "seg-black")"
-                             style="transform: rotate(@(angle.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))deg)">
-                        </div>
+                        int wn = wheelOrder[i];
+                        string col = wn == 0 ? "#1a6b1a" : IsRed(wn) ? "#8B0000" : "#0f0f0f";
+                        double s = i * seg;
+                        double e = (i + 1) * seg;
+                        string si = s.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+                        string ei = e.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+                        cgParts.Add(col + " " + si + "deg " + ei + "deg");
                     }
-                    <div class="rl-wheel-center">
-                        @if (isSpinning)
+                    string bg = "conic-gradient(" + string.Join(",", cgParts) + ")";
+                }
+
+                @* 1. CONTAINERUL ROTIT DE BLAZOR (Animat prin CSS) *@
+                <div id="the-wheel-rotator" class="rl-wheel-rotator" style="transform: rotate(@(currentWheelDeg.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))deg)">
+                    
+                    @* Partea colorată strict de Blazor *@
+                    <div class="rl-wheel-spinning" style="background: @bg">
+                        
+                        @for (int i = 0; i < wheelOrder.Length; i++)
                         {
-                            <span class="rl-spinning-dot">◉</span>
+                            int wn = wheelOrder[i];
+                            double midAngle = (i + 0.5) * seg;
+                            string ma = midAngle.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+                            <div class="rl-seg-num" style="transform: rotate(@(ma)deg)">
+                                @wn
+                            </div>
                         }
-                        else if (lastResult >= 0)
+
+                        @for (int i = 0; i < wheelOrder.Length; i++)
                         {
-                            <span class="rl-result-num @(lastResult == 0 ? "rn-green" : IsRed(lastResult) ? "rn-red" : "rn-black")">
-                                @lastResult
-                            </span>
+                            double lineAngle = i * seg;
+                            string la = lineAngle.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+                            <div class="rl-divider" style="transform: rotate(@(la)deg)"></div>
                         }
-                        else
-                        {
-                            <span class="rl-wheel-logo">⚜</span>
-                        }
+
+                        <div class="rl-ring rl-ring-outer"></div>
+                        <div class="rl-ring rl-ring-inner"></div>
+
                     </div>
                 </div>
-                <div class="rl-wheel-border"></div>
-                @* Indicator *@
-                <div class="rl-indicator">▼</div>
+
+                @* 3. BILA (Rotită tot de Blazor, în sens invers) *@
+                <div class="rl-ball-container" id="rl-ball-container" style="transform: rotate(@(currentBallDeg.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))deg)">
+                    <div class="rl-ball"></div>
+                </div>
+
+                @* 4. Centrul FIX — nu se invarte *@
+                <div class="rl-wheel-center">
+                    @if (isSpinning)
+                    {
+                        <div class="rl-center-spin">
+                            <div class="rl-center-dot"></div>
+                        </div>
+                    }
+                    else if (lastResult >= 0)
+                    {
+                        string nc = lastResult == 0 ? "rn-green" : IsRed(lastResult) ? "rn-red" : "rn-black";
+                        <span class="rl-result-num @nc">@lastResult</span>
+                    }
+                    else
+                    {
+                        <span class="rl-logo">⚜</span>
+                    }
+                </div>
+
             </div>
         </div>
 
-        @* PANOU DREAPTA: Pariu curent + Rezultat *@
+        @* ── PANOU DREAPTA ─── *@
         <div class="rl-right-panel">
 
-            <div class="rl-balance-box">
+            <div class="rl-info-box">
                 <span class="rl-lbl">BALANȚĂ</span>
                 <span class="rl-balance-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
             </div>
 
-            @* Suma pariata total *@
-            <div class="rl-total-bet-box">
+            <div class="rl-info-box">
                 <span class="rl-lbl">PARIU TOTAL</span>
                 <span class="rl-total-val">@bets.Values.Sum() RON</span>
             </div>
 
-            @* Jetonul selectat *@
-            <div class="rl-chip-select">
+            <div class="rl-info-box">
                 <span class="rl-lbl">JETON ACTIV</span>
-                <div class="rl-chips-small">
+                <div class="rl-chips-row">
                     @foreach (var cv in chipDenoms)
                     {
                         int c = cv;
-                        <button class="rl-chip-sm chip-@c @(selectedChip == c ? "chip-active" : "")"
+                        <button class="rl-chip chip-@c @(selectedChip == c ? "chip-sel" : "")"
                                 @onclick="() => selectedChip = c">@c</button>
                     }
                 </div>
             </div>
 
-            @* Rezultat *@
             @if (!isSpinning && lastResult >= 0)
             {
-                <div class="rl-last-result @(lastResult == 0 ? "lr-green" : IsRed(lastResult) ? "lr-red" : "lr-black")">
-                    <span class="lr-label">NUMĂR</span>
-                    <span class="lr-number">@lastResult</span>
-                    <span class="lr-props">
-                        @(lastResult == 0 ? "ZERO" : $"{(IsRed(lastResult) ? "ROȘU" : "NEGRU")} · {(lastResult % 2 == 0 ? "PAR" : "IMPAR")} · {(lastResult <= 18 ? "1-18" : "19-36")}")
-                    </span>
+                string lrc = lastResult == 0 ? "lr-green" : IsRed(lastResult) ? "lr-red" : "lr-black";
+                string lrp = lastResult == 0
+                    ? "ZERO"
+                    : (IsRed(lastResult) ? "ROȘU" : "NEGRU") + " · " + (lastResult % 2 == 0 ? "PAR" : "IMPAR") + " · " + (lastResult <= 18 ? "1-18" : "19-36");
+                <div class="rl-last-result @lrc">
+                    <span class="lr-lbl">NUMĂRUL</span>
+                    <span class="lr-num">@lastResult</span>
+                    <span class="lr-props">@lrp</span>
                 </div>
             }
 
-            @* Win/Lose *@
             @if (showResult)
             {
-                <div class="rl-win-box @(totalWin > 0 ? "wb-win" : "wb-lose")">
+                string wc = totalWin > 0 ? "wb-win" : "wb-lose";
+                <div class="rl-win-box @wc">
                     @if (totalWin > 0)
                     {
                         <span>🎉 +@totalWin.ToString("F2") RON</span>
@@ -101,14 +142,23 @@
                 </div>
             }
 
-            <div class="rl-spin-controls">
-                <button class="rl-clear-btn" @onclick="ClearBets" disabled="@(isSpinning || bets.Count == 0)">
+            <div class="rl-btn-col">
+                <button class="rl-clear-btn" @onclick="ClearBets"
+                        disabled="@(isSpinning || bets.Count == 0)">
                     ✕ STERGE PARIURI
                 </button>
-                <button class="rl-spin-btn @(isSpinning ? "spinning" : "") @(bets.Count == 0 ? "spin-off" : "")"
-                        @onclick="Spin" disabled="@(isSpinning || bets.Count == 0)">
-                    @if (isSpinning) { <span class="spin-rot">◉</span> <span>SE INVARTE</span> }
-                    else { <span>⚡ SPIN</span> }
+                <button class="rl-spin-btn @(bets.Count == 0 || isSpinning ? "spin-off" : "")"
+                        @onclick="Spin"
+                        disabled="@(isSpinning || bets.Count == 0)">
+                    @if (isSpinning)
+                    {
+                        <span class="spin-rot">◉</span>
+                        <span>SE INVARTE...</span>
+                    }
+                    else
+                    {
+                        <span>⚡ SPIN</span>
+                    }
                 </button>
             </div>
 
@@ -120,149 +170,114 @@
         </div>
     </div>
 
-    @* ── MASA DE PARIURI ──────────────────────────────────────────────────── *@
-    <div class="rl-table">
+    @* ── MASA DE PARIURI ─── *@
+    <div class="rl-betting-table">
 
-        @* Capul tablei: 0 *@
-        <div class="rl-zero-row">
-        <div class="rl-cell cell-zero @(GetCellClass(0))" @onclick='() => PlaceBet("num-0")'>
-            <span class="cell-num">0</span>
-                @if (bets.ContainsKey("num-0"))
-                {
-                    <span class="cell-chip chip-@selectedChip">@bets["num-0"]</span>
-                }
+        @{
+            var kZero = "num-0";
+            var kCol1 = "col1"; var kCol2 = "col2"; var kCol3 = "col3";
+        }
+        <div class="rl-top-row">
+            <div class="rl-cell cell-zero @(lastResult == 0 && !isSpinning && lastResult >= 0 ? "cell-hit" : "") @(bets.ContainsKey(kZero) ? "cell-has-bet" : "")"
+                 @onclick="() => PlaceBet(kZero)">
+                <span class="cell-num">0</span>
+                @if (bets.ContainsKey(kZero))
+                { <span class="cell-chip chip-@selectedChip">@bets[kZero]</span> }
             </div>
-            <div class="rl-col-labels">
-                <div class="rl-col-lbl" @onclick='() => PlaceBet("col3")'>
-                    COL 3 (2:1) @(bets.ContainsKey("col3") ? $"· {bets["col3"]}" : "")
+            <div class="rl-col-btns">
+                <div class="rl-col-btn @(bets.ContainsKey(kCol3) ? "col-has-bet" : "")" @onclick="() => PlaceBet(kCol3)">
+                    COL 3 — 2:1 @(bets.ContainsKey(kCol3) ? "[" + bets[kCol3] + "]" : "")
                 </div>
-                <div class="rl-col-lbl" @onclick='() => PlaceBet("col2")'>
-                    COL 2 (2:1) @(bets.ContainsKey("col2") ? $"· {bets["col2"]}" : "")
+                <div class="rl-col-btn @(bets.ContainsKey(kCol2) ? "col-has-bet" : "")" @onclick="() => PlaceBet(kCol2)">
+                    COL 2 — 2:1 @(bets.ContainsKey(kCol2) ? "[" + bets[kCol2] + "]" : "")
                 </div>
-                <div class="rl-col-lbl" @onclick='() => PlaceBet("col1")'>
-                    COL 1 (2:1) @(bets.ContainsKey("col1") ? $"· {bets["col1"]}" : "")
+                <div class="rl-col-btn @(bets.ContainsKey(kCol1) ? "col-has-bet" : "")" @onclick="() => PlaceBet(kCol1)">
+                    COL 1 — 2:1 @(bets.ContainsKey(kCol1) ? "[" + bets[kCol1] + "]" : "")
                 </div>
             </div>
         </div>
 
-        @* Grila de numere 1-36 *@
         <div class="rl-numbers-grid">
             @for (int col = 1; col <= 12; col++)
             {
-                int c = col;
-                <div class="rl-number-col">
+                <div class="rl-num-col">
                     @foreach (int row in new[] { 3, 2, 1 })
                     {
-                        int num = (c - 1) * 3 + row;
-                        string key = $"num-{num}";
-                        <div class="rl-cell @(IsRed(num) ? "cell-red" : "cell-black") @(lastResult == num && !isSpinning && lastResult >= 0 ? "cell-hit" : "") @(bets.ContainsKey(key) ? "cell-has-bet" : "")"
-                             @onclick="() => PlaceBet(key)">
+                        int num = (col - 1) * 3 + row;
+                        string key = "num-" + num;
+                        string cc  = IsRed(num) ? "cell-red" : "cell-black";
+                        string hit = (lastResult == num && !isSpinning && lastResult > 0) ? "cell-hit" : "";
+                        string hb  = bets.ContainsKey(key) ? "cell-has-bet" : "";
+                        <div class="rl-cell @cc @hit @hb" @onclick="() => PlaceBet(key)">
                             <span class="cell-num">@num</span>
                             @if (bets.ContainsKey(key))
-                            {
-                                <span class="cell-chip chip-@selectedChip">@bets[key]</span>
-                            }
+                            { <span class="cell-chip chip-@selectedChip">@bets[key]</span> }
                         </div>
                     }
                 </div>
             }
         </div>
 
-        @* Duzine *@
+        @{
+            var kD1 = "doz1"; var kD2 = "doz2"; var kD3 = "doz3";
+        }
         <div class="rl-dozens">
-            <div class="rl-outside-cell @(bets.ContainsKey("doz1") ? "ob-active" : "")" @onclick='() => PlaceBet("doz1")'>
-                1ª (1-12) @(bets.ContainsKey("doz1") ? $"· {bets["doz1"]}" : "")
+            <div class="rl-outside-cell @(bets.ContainsKey(kD1) ? "ob-active" : "")" @onclick="() => PlaceBet(kD1)">
+                1ª (1-12) @(bets.ContainsKey(kD1) ? "[" + bets[kD1] + "]" : "")
             </div>
-            <div class="rl-outside-cell @(bets.ContainsKey("doz2") ? "ob-active" : "")" @onclick='() => PlaceBet("doz2")'>
-                2ª (13-24) @(bets.ContainsKey("doz2") ? $"· {bets["doz2"]}" : "")
+            <div class="rl-outside-cell @(bets.ContainsKey(kD2) ? "ob-active" : "")" @onclick="() => PlaceBet(kD2)">
+                2ª (13-24) @(bets.ContainsKey(kD2) ? "[" + bets[kD2] + "]" : "")
             </div>
-            <div class="rl-outside-cell @(bets.ContainsKey("doz3") ? "ob-active" : "")" @onclick='() => PlaceBet("doz3")'>
-                3ª (25-36) @(bets.ContainsKey("doz3") ? $"· {bets["doz3"]}" : "")
+            <div class="rl-outside-cell @(bets.ContainsKey(kD3) ? "ob-active" : "")" @onclick="() => PlaceBet(kD3)">
+                3ª (25-36) @(bets.ContainsKey(kD3) ? "[" + bets[kD3] + "]" : "")
             </div>
         </div>
 
-        @* Pariuri exterioare *@
+        @{
+            var kLow = "low"; var kEven = "even"; var kRed = "red";
+            var kBlack = "black"; var kOdd = "odd"; var kHigh = "high";
+        }
         <div class="rl-outside">
-            <div class="rl-outside-cell @(bets.ContainsKey("low")   ? "ob-active" : "")" @onclick='() => PlaceBet("low")'>
-                1-18 @(bets.ContainsKey("low") ? $"· {bets["low"]}" : "")
+            <div class="rl-outside-cell @(bets.ContainsKey(kLow)   ? "ob-active" : "")" @onclick="() => PlaceBet(kLow)">
+                1-18 @(bets.ContainsKey(kLow) ? "[" + bets[kLow] + "]" : "")
             </div>
-            <div class="rl-outside-cell ob-even @(bets.ContainsKey("even") ? "ob-active" : "")" @onclick='() => PlaceBet("even")'>
-                PAR @(bets.ContainsKey("even") ? $"· {bets["even"]}" : "")
+            <div class="rl-outside-cell @(bets.ContainsKey(kEven)  ? "ob-active" : "")" @onclick="() => PlaceBet(kEven)">
+                PAR @(bets.ContainsKey(kEven) ? "[" + bets[kEven] + "]" : "")
             </div>
-            <div class="rl-outside-cell ob-red @(bets.ContainsKey("red")   ? "ob-active" : "")" @onclick='() => PlaceBet("red")'>
-                ROȘU @(bets.ContainsKey("red") ? $"· {bets["red"]}" : "")
+            <div class="rl-outside-cell ob-red @(bets.ContainsKey(kRed) ? "ob-active" : "")" @onclick="() => PlaceBet(kRed)">
+                ROȘU @(bets.ContainsKey(kRed) ? "[" + bets[kRed] + "]" : "")
             </div>
-            <div class="rl-outside-cell ob-black @(bets.ContainsKey("black") ? "ob-active" : "")" @onclick='() => PlaceBet("black")'>
-                NEGRU @(bets.ContainsKey("black") ? $"· {bets["black"]}" : "")
+            <div class="rl-outside-cell ob-black @(bets.ContainsKey(kBlack) ? "ob-active" : "")" @onclick="() => PlaceBet(kBlack)">
+                NEGRU @(bets.ContainsKey(kBlack) ? "[" + bets[kBlack] + "]" : "")
             </div>
-            <div class="rl-outside-cell ob-odd @(bets.ContainsKey("odd")  ? "ob-active" : "")" @onclick='() => PlaceBet("odd")'>
-                IMPAR @(bets.ContainsKey("odd") ? $"· {bets["odd"]}" : "")
+            <div class="rl-outside-cell @(bets.ContainsKey(kOdd)   ? "ob-active" : "")" @onclick="() => PlaceBet(kOdd)">
+                IMPAR @(bets.ContainsKey(kOdd) ? "[" + bets[kOdd] + "]" : "")
             </div>
-            <div class="rl-outside-cell @(bets.ContainsKey("high") ? "ob-active" : "")" @onclick='() => PlaceBet("high")'>
-                19-36 @(bets.ContainsKey("high") ? $"· {bets["high"]}" : "")
+            <div class="rl-outside-cell @(bets.ContainsKey(kHigh)  ? "ob-active" : "")" @onclick="() => PlaceBet(kHigh)">
+                19-36 @(bets.ContainsKey(kHigh) ? "[" + bets[kHigh] + "]" : "")
             </div>
         </div>
 
     </div>
 
-    @* Istoricul ultimelor numere *@
     @if (history.Count > 0)
     {
         <div class="rl-history">
             <span class="rl-hist-lbl">ISTORIC:</span>
             @foreach (var h in history.AsEnumerable().Reverse().Take(15))
             {
-                <span class="rl-hist-num @(h == 0 ? "hn-green" : IsRed(h) ? "hn-red" : "hn-black")">@h</span>
+                string hc = h == 0 ? "hn-green" : IsRed(h) ? "hn-red" : "hn-black";
+                <span class="rl-hist-num @hc">@h</span>
             }
         </div>
     }
 
 </div>
 
-@* ── JS ─────────────────────────────────────────────────────────────────── *@
-<script>
-window.rouletteGame = (function() {
-    var dotnet = null;
-    var spinning = false;
-    var currentDeg = 0;
-
-    function init(ref) { dotnet = ref; }
-
-    function spin(resultIndex, totalNumbers) {
-        if (spinning) return;
-        spinning = true;
-
-        var wheel = document.getElementById('rl-wheel');
-        if (!wheel) return;
-
-        // Fiecare segment = 360/37 grade
-        var segDeg   = 360 / totalNumbers;
-        // Rotim astfel incat rezultatul sa fie la indicator (sus = 0 grade)
-        // Adaugam 5-8 rotatii complete pentru efect
-        var extraSpins  = (5 + Math.floor(Math.random() * 3)) * 360;
-        var targetAngle = extraSpins + (totalNumbers - resultIndex) * segDeg;
-
-        var duration = 4000 + Math.random() * 1000;
-
-        wheel.style.transition = 'transform ' + duration + 'ms cubic-bezier(0.17, 0.67, 0.12, 1.0)';
-        currentDeg += targetAngle;
-        wheel.style.transform = 'rotate(' + currentDeg + 'deg)';
-
-        setTimeout(function() {
-            spinning = false;
-            wheel.style.transition = '';
-            if (dotnet) dotnet.invokeMethodAsync('OnWheelStopped');
-        }, duration + 100);
-    }
-
-    return { init: init, spin: spin };
-})();
-</script>
-
 @code {
 
-    // ── Ordinea europeana a numerelor pe roata ──────────────────────────
-    private readonly int[] wheelOrder = {
+    private readonly int[] wheelOrder =
+    {
         0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26
     };
 
@@ -271,7 +286,6 @@ window.rouletteGame = (function() {
         1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36
     };
 
-    // ── Stare ───────────────────────────────────────────────────────────
     private Dictionary<string, int> bets       = new();
     private List<int>               history    = new();
     private int                     lastResult = -1;
@@ -280,131 +294,107 @@ window.rouletteGame = (function() {
     private bool                    showResult = false;
     private string                  errorMsg   = "";
 
-    // ── Pariuri ─────────────────────────────────────────────────────────
-    private readonly int[] chipDenoms  = { 1, 5, 10, 25, 50, 100 };
+    private readonly int[] chipDenoms   = { 1, 5, 10, 25, 50, 100 };
     private int            selectedChip = 5;
 
-    // ── JS interop ──────────────────────────────────────────────────────
-    private DotNetObjectReference<Roulette>? dotnetRef;
+    // 🟢 Variabilele pentru unghiurile roții și ale bilei
+    private double currentWheelDeg = 0;
+    private double currentBallDeg  = 0;
 
     protected override void OnInitialized()
     {
-        Session.OnChange += OnSessionChanged;
-        dotnetRef = DotNetObjectReference.Create(this);
+        Session.OnChange += Refresh;
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-            await JS.InvokeVoidAsync("rouletteGame.init", dotnetRef);
-    }
-
-    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
+    private void Refresh() => InvokeAsync(StateHasChanged);
 
     public void Dispose()
     {
-        Session.OnChange -= OnSessionChanged;
-        dotnetRef?.Dispose();
+        Session.OnChange -= Refresh;
     }
 
-    // ── Plaseaza pariu ──────────────────────────────────────────────────
     private void PlaceBet(string betKey)
     {
         if (isSpinning) return;
-
-        int totalBetNow = bets.Values.Sum();
-        if (Session.CurrentPlayer!.Balance < totalBetNow + selectedChip)
+        if (Session.CurrentPlayer!.Balance < bets.Values.Sum() + selectedChip)
         {
             errorMsg = "Balanță insuficientă!";
             return;
         }
-        errorMsg   = "";
-        showResult = false;
-
-        if (bets.ContainsKey(betKey))
-            bets[betKey] += selectedChip;
-        else
-            bets[betKey] = selectedChip;
+        errorMsg = ""; showResult = false;
+        if (bets.ContainsKey(betKey)) bets[betKey] += selectedChip;
+        else bets[betKey] = selectedChip;
     }
 
     private void ClearBets()
     {
-        bets       = new();
-        showResult = false;
-        errorMsg   = "";
+        bets = new(); showResult = false; errorMsg = "";
     }
 
-    // ── SPIN ────────────────────────────────────────────────────────────
     private async Task Spin()
     {
         if (isSpinning || bets.Count == 0) return;
-
         int totalBet = bets.Values.Sum();
-        if (Session.CurrentPlayer!.Balance < totalBet)
-        {
-            errorMsg = "Balanță insuficientă!";
-            return;
-        }
+        if (Session.CurrentPlayer!.Balance < totalBet) { errorMsg = "Balanță insuficientă!"; return; }
 
-        // Scade pariul total
         var balAfterBet = Session.CurrentPlayer.Balance - totalBet;
         Session.UpdateBalance(balAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
 
-        errorMsg   = "";
-        isSpinning = true;
-        showResult = false;
+        errorMsg = ""; isSpinning = true; showResult = false; totalWin = 0;
 
-        // Genereaza rezultatul
-        var rng     = new Random();
-        int resIdx  = rng.Next(wheelOrder.Length);
-        lastResult  = wheelOrder[resIdx];
+        var rng    = new Random();
+        int resIdx = rng.Next(wheelOrder.Length);
+        lastResult = wheelOrder[resIdx]; // Numărul câștigător
 
-        await InvokeAsync(StateHasChanged);
+        // 1. CALCULĂM ROTAȚIA ROȚII (Sens Orar)
+        double segDeg = 360.0 / wheelOrder.Length;
+        double extraSpins = (6 + rng.Next(0, 4)) * 360;
+        double target = extraSpins + ((wheelOrder.Length - resIdx) * segDeg);
+        currentWheelDeg += target;
 
-        // Porneste animatia roatei
-        await JS.InvokeVoidAsync("rouletteGame.spin", dotnetRef, resIdx, wheelOrder.Length);
-    }
+        // 2. CALCULĂM ROTAȚIA BILEI (Sens Invers / Negativ)
+        double ballExtraSpins = (8 + rng.Next(0, 5)) * 360;
+        currentBallDeg -= ballExtraSpins; 
 
-    // ── Chemat din JS dupa ce roata s-a oprit ───────────────────────────
-    [JSInvokable]
-    public async Task OnWheelStopped()
-    {
+        // 3. DECLANȘĂM ANIMAȚIA
+        StateHasChanged(); 
+
+        // 4. AȘTEPTĂM SĂ SE TERMINE ANIMAȚIA (4.5 secunde CSS + marjă)
+        await Task.Delay(4700);
+
+        // 5. ANUNȚĂM REZULTATUL
         CalculateWins();
         history.Add(lastResult);
-        isSpinning = false;
+        isSpinning = false; 
         showResult = true;
-        bets       = new(); // sterge pariurile dupa fiecare spin
-        await InvokeAsync(StateHasChanged);
+        bets = new();
+        
+        StateHasChanged();
     }
 
-    // ── Calcul castiguri ─────────────────────────────────────────────────
     private void CalculateWins()
     {
         totalWin = 0;
         int n = lastResult;
-
         foreach (var (key, amount) in bets)
         {
-            double payout = 0;
-
-            if (key == $"num-{n}")          payout = amount * 36;       // 35:1 + bet back
-            else if (key == "red"   && IsRed(n) && n != 0)  payout = amount * 2;
-            else if (key == "black" && !IsRed(n) && n != 0) payout = amount * 2;
-            else if (key == "even"  && n != 0 && n % 2 == 0) payout = amount * 2;
-            else if (key == "odd"   && n != 0 && n % 2 != 0) payout = amount * 2;
-            else if (key == "low"   && n >= 1  && n <= 18)  payout = amount * 2;
-            else if (key == "high"  && n >= 19 && n <= 36)  payout = amount * 2;
-            else if (key == "doz1"  && n >= 1  && n <= 12)  payout = amount * 3;
-            else if (key == "doz2"  && n >= 13 && n <= 24)  payout = amount * 3;
-            else if (key == "doz3"  && n >= 25 && n <= 36)  payout = amount * 3;
-            else if (key == "col1"  && n != 0 && n % 3 == 1) payout = amount * 3;
-            else if (key == "col2"  && n != 0 && n % 3 == 2) payout = amount * 3;
-            else if (key == "col3"  && n != 0 && n % 3 == 0) payout = amount * 3;
-
-            totalWin += payout;
+            double p = 0;
+            if      (key == "num-" + n)                       p = amount * 36;
+            else if (key == "red"   && IsRed(n)  && n != 0)   p = amount * 2;
+            else if (key == "black" && !IsRed(n) && n != 0)   p = amount * 2;
+            else if (key == "even"  && n != 0 && n % 2 == 0)  p = amount * 2;
+            else if (key == "odd"   && n != 0 && n % 2 != 0)  p = amount * 2;
+            else if (key == "low"   && n >= 1  && n <= 18)    p = amount * 2;
+            else if (key == "high"  && n >= 19 && n <= 36)    p = amount * 2;
+            else if (key == "doz1"  && n >= 1  && n <= 12)    p = amount * 3;
+            else if (key == "doz2"  && n >= 13 && n <= 24)    p = amount * 3;
+            else if (key == "doz3"  && n >= 25 && n <= 36)    p = amount * 3;
+            else if (key == "col1"  && n != 0 && n % 3 == 1)  p = amount * 3;
+            else if (key == "col2"  && n != 0 && n % 3 == 2)  p = amount * 3;
+            else if (key == "col3"  && n != 0 && n % 3 == 0)  p = amount * 3;
+            totalWin += p;
         }
-
         if (totalWin > 0)
         {
             var newBal = Session.CurrentPlayer!.Balance + totalWin;
@@ -413,131 +403,156 @@ window.rouletteGame = (function() {
         }
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────
-    private bool   IsRed(int n) => redNumbers.Contains(n);
-
-    private string GetCellClass(int n)
-    {
-        if (n == 0) return "cell-zero";
-        return IsRed(n) ? "cell-red" : "cell-black";
-    }
+    private bool IsRed(int n) => redNumbers.Contains(n);
 }
 
 <style>
-    /* ── WRAPPER ─────────────────────────────────────────────────────────── */
     .rl-wrapper {
-        font-family: 'Rajdhani', sans-serif;
-        color: #f0e6d3;
-        display: flex; flex-direction: column; align-items: center; gap: 18px;
-        padding: 24px 20px 32px;
-        background: radial-gradient(ellipse 100% 60% at 50% 0%, #0d0d0d 0%, #080808 100%);
+        font-family: 'Rajdhani', sans-serif; color: #f0e6d3;
+        display: flex; flex-direction: column; align-items: center; gap: 20px;
+        padding: 24px 16px 36px;
+        background: radial-gradient(ellipse 100% 60% at 50% 0%, #0d0d0d, #080808);
     }
 
-    /* ── TOP SECTION ─────────────────────────────────────────────────────── */
     .rl-top-section {
-        display: flex; gap: 28px; align-items: flex-start;
-        width: 100%; max-width: 820px;
-        flex-wrap: wrap; justify-content: center;
+        display: flex; gap: 32px; align-items: flex-start;
+        width: 100%; max-width: 840px; flex-wrap: wrap; justify-content: center;
     }
 
-    /* ── ROATA ───────────────────────────────────────────────────────────── */
-    .rl-wheel-container {
-        display: flex; align-items: center; justify-content: center;
-        position: relative;
-    }
-    .rl-wheel {
-        position: relative;
-        width: 220px; height: 220px;
-        border-radius: 50%;
+    /* ── ROATA ── */
+    .rl-wheel-wrap {
+        display: flex; flex-direction: column; align-items: center; gap: 4px;
         flex-shrink: 0;
     }
-    .rl-wheel-inner {
-        width: 100%; height: 100%;
-        border-radius: 50%;
-        overflow: hidden;
-        position: relative;
-        background: #111;
-        box-shadow:
-            0 0 0 6px #1a1a1a,
-            0 0 0 8px rgba(212,175,55,0.4),
-            0 0 0 12px #1a1a1a,
-            0 0 40px rgba(0,0,0,0.8);
+    .rl-indicator {
+        color: #D4AF37; font-size: 1.5rem; line-height: 1;
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.9));
+        margin-bottom: -4px; z-index: 30; position: relative;
     }
-    .rl-wheel-border {
+
+    /* Container fix - tine roata + centrul */
+    .rl-wheel-outer {
+        position: relative;
+        width: 260px; height: 260px;
+        border-radius: 50%;
+        /* Bordura aurie */
+        box-shadow:
+            0 0 0 5px #0a0a0a,
+            0 0 0 9px rgba(212,175,55,0.5),
+            0 0 0 12px #0a0a0a,
+            0 0 0 16px rgba(212,175,55,0.25),
+            0 0 60px rgba(0,0,0,0.9);
+    }
+    
+    /* 🟢 Containerul pe care îl rotește Blazor */
+    .rl-wheel-rotator {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        z-index: 10;
+        /* Asta face animația fluidă de 4.5 secunde */
+        transition: transform 4.5s cubic-bezier(0.15, 0.65, 0.1, 1.0); 
+    }
+
+    /* ROATA CARE SE INVARTE */
+    .rl-wheel-spinning {
         position: absolute; inset: 0;
         border-radius: 50%;
-        border: 3px solid rgba(212,175,55,0.3);
+    }
+
+    /* Numere pe roata */
+    .rl-seg-num {
+        position: absolute;
+        top: 0; 
+        left: 50%;
+        height: 50%; 
+        transform-origin: bottom center; 
+        margin-left: -8px;
+        width: 16px;
+        padding-top: 8px; 
+        text-align: center;
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 0.55rem;
+        color: rgba(255,255,255,0.85);
+        line-height: 1;
         pointer-events: none;
     }
 
-    /* Segmente roata */
-    .rl-seg {
+    /* Linii de separare */
+    .rl-divider {
         position: absolute;
-        top: 0; left: 50%;
-        width: 2px;
-        height: 50%;
+        top: 0; left: calc(50% - 0.5px);
+        width: 1px; height: 50%;
         transform-origin: bottom center;
-        border-left: 1px solid rgba(255,255,255,0.15);
+        background: rgba(0,0,0,0.5);
+        pointer-events: none;
     }
-    .seg-red   { border-left-color: rgba(196,30,58,0.6); }
-    .seg-black { border-left-color: rgba(30,30,30,0.8); }
-    .seg-green { border-left-color: rgba(0,128,0,0.8); }
 
-    /* Centrul roatei */
+    /* Cercuri decorative */
+    .rl-ring {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        border: 1px solid rgba(212,175,55,0.25);
+    }
+    .rl-ring-outer { inset: 2px; }
+    .rl-ring-inner { inset: 25%; }
+
+    /* CENTRUL FIX */
     .rl-wheel-center {
         position: absolute;
         top: 50%; left: 50%;
         transform: translate(-50%, -50%);
-        width: 80px; height: 80px;
+        width: 76px; height: 76px;
         border-radius: 50%;
-        background: radial-gradient(circle, #1a1a1a 0%, #0d0d0d 100%);
-        border: 3px solid rgba(212,175,55,0.4);
+        background: radial-gradient(circle, #242424 0%, #0a0a0a 100%);
+        border: 3px solid rgba(212,175,55,0.6);
+        box-shadow: 0 0 20px rgba(0,0,0,0.9), inset 0 0 12px rgba(0,0,0,0.7),
+                    0 0 0 4px #111;
         display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 0 20px rgba(0,0,0,0.8);
-        z-index: 10;
+        z-index: 20;
+        pointer-events: none;
     }
     .rl-result-num {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 2rem; letter-spacing: 1px;
+        font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 1px;
     }
-    .rn-green { color: #27ae60; text-shadow: 0 0 12px rgba(39,174,96,0.8); }
-    .rn-red   { color: #e74c3c; text-shadow: 0 0 12px rgba(231,76,60,0.8); }
-    .rn-black { color: #f0e6d3; text-shadow: 0 0 12px rgba(240,230,211,0.4); }
-    .rl-wheel-logo { font-size: 1.8rem; color: rgba(212,175,55,0.3); }
-    .rl-spinning-dot { font-size: 1.8rem; color: #D4AF37; animation: spinRot 0.5s linear infinite; display: inline-block; }
+    .rn-green { color: #2ecc71; text-shadow: 0 0 14px rgba(46,204,113,0.9); }
+    .rn-red   { color: #e74c3c; text-shadow: 0 0 14px rgba(231,76,60,0.9); }
+    .rn-black { color: #f0e6d3; }
+    .rl-logo  { font-size: 1.8rem; color: rgba(212,175,55,0.3); }
+
+    /* Animatie centru cand se invarte */
+    .rl-center-spin {
+        width: 20px; height: 20px; position: relative;
+        animation: centerPulse 0.8s ease-in-out infinite;
+    }
+    .rl-center-dot {
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #D4AF37;
+        box-shadow: 0 0 12px rgba(212,175,55,0.9);
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%,-50%);
+    }
+    @@keyframes centerPulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.3); } }
     @@keyframes spinRot { to { transform: rotate(360deg); } }
+    .spin-rot { animation: spinRot 0.5s linear infinite; display: inline-block; }
 
-    /* Indicator */
-    .rl-indicator {
-        position: absolute;
-        top: -14px; left: 50%;
-        transform: translateX(-50%);
-        color: #D4AF37;
-        font-size: 1.2rem;
-        z-index: 20;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
-    }
+    /* ── PANOU DREAPTA ── */
+    .rl-right-panel { display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 200px; max-width: 280px; }
+    .rl-lbl { display: block; font-size: 0.62rem; letter-spacing: 3px; color: #444; font-weight: 700; margin-bottom: 4px; }
+    .rl-balance-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: #D4AF37; letter-spacing: 2px; }
+    .rl-total-val   { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: #f0e6d3; letter-spacing: 1px; }
 
-    /* ── PANOUL DIN DREAPTA ──────────────────────────────────────────────── */
-    .rl-right-panel {
-        display: flex; flex-direction: column; gap: 12px;
-        min-width: 220px; flex: 1; max-width: 300px;
-    }
-    .rl-lbl { display: block; font-size: 0.62rem; letter-spacing: 3px; color: #444; font-weight: 700; margin-bottom: 3px; }
-    .rl-balance-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: #D4AF37; letter-spacing: 2px; }
-    .rl-total-val   { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: #f0e6d3; letter-spacing: 1px; }
-
-    /* Jetoane mici de selectat */
-    .rl-chips-small { display: flex; gap: 6px; flex-wrap: wrap; }
-    .rl-chip-sm {
-        width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer;
-        font-family: 'Bebas Neue', sans-serif; font-size: 0.8rem; color: white;
-        transition: all 0.15s; position: relative;
+    .rl-chips-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .rl-chip {
+        width: 40px; height: 40px; border-radius: 50%; border: none;
+        cursor: pointer; font-family: 'Bebas Neue', sans-serif; font-size: 0.82rem;
+        color: white; transition: all 0.15s; position: relative;
         box-shadow: 0 3px 8px rgba(0,0,0,0.5);
     }
-    .rl-chip-sm::before { content:''; position:absolute; inset:3px; border-radius:50%; border:1px dashed rgba(255,255,255,0.3); }
-    .rl-chip-sm:hover { transform: scale(1.1); }
-    .rl-chip-sm.chip-active { transform: scale(1.15); box-shadow: 0 0 14px rgba(212,175,55,0.6); outline: 2px solid #D4AF37; }
+    .rl-chip::before { content:''; position:absolute; inset:3px; border-radius:50%; border:1px dashed rgba(255,255,255,0.3); }
+    .rl-chip:hover   { transform: scale(1.1); }
+    .rl-chip.chip-sel { transform: scale(1.18); outline: 2px solid #D4AF37; box-shadow: 0 0 14px rgba(212,175,55,0.7); }
     .chip-1   { background: linear-gradient(160deg,#bbb,#888); }
     .chip-5   { background: linear-gradient(160deg,#e74c3c,#c0392b); }
     .chip-10  { background: linear-gradient(160deg,#3498db,#2980b9); }
@@ -545,150 +560,93 @@ window.rouletteGame = (function() {
     .chip-50  { background: linear-gradient(160deg,#e67e22,#d35400); }
     .chip-100 { background: linear-gradient(160deg,#9b59b6,#6c3483); }
 
-    /* Ultimul rezultat */
-    .rl-last-result {
-        display: flex; flex-direction: column; gap: 2px;
-        padding: 10px 16px; border-radius: 8px;
-        animation: resIn 0.3s ease;
-    }
+    .rl-last-result { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 8px; animation: resIn 0.3s ease; }
     @@keyframes resIn { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
-    .lr-label  { font-size: 0.62rem; letter-spacing: 3px; color: rgba(255,255,255,0.3); }
-    .lr-number { font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem; letter-spacing: 2px; line-height: 1; }
-    .lr-props  { font-size: 0.75rem; letter-spacing: 1px; opacity: 0.7; }
-    .lr-green { background: rgba(39,174,96,0.15); border: 1px solid rgba(39,174,96,0.4); color: #2ecc71; }
-    .lr-red   { background: rgba(196,30,58,0.15); border: 1px solid rgba(196,30,58,0.4); color: #e74c3c; }
-    .lr-black { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #f0e6d3; }
+    .lr-lbl  { font-size: 0.62rem; letter-spacing: 3px; color: rgba(255,255,255,0.25); }
+    .lr-num  { font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem; letter-spacing: 2px; line-height: 1; }
+    .lr-props{ font-size: 0.72rem; letter-spacing: 0.5px; opacity: 0.7; }
+    .lr-green { background: rgba(39,174,96,0.12);  border: 1px solid rgba(39,174,96,0.4);  color: #2ecc71; }
+    .lr-red   { background: rgba(196,30,58,0.12);  border: 1px solid rgba(196,30,58,0.4);  color: #e74c3c; }
+    .lr-black { background: rgba(255,255,255,0.04);border: 1px solid rgba(255,255,255,0.12);color: #f0e6d3; }
 
-    /* Win/Lose box */
-    .rl-win-box { padding: 10px 16px; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 2px; animation: resIn 0.3s ease; }
+    .rl-win-box { padding: 10px 14px; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 2px; animation: resIn 0.3s ease; }
     .wb-win  { background: rgba(39,174,96,0.12);  border: 1px solid rgba(39,174,96,0.4);  color: #2ecc71; }
     .wb-lose { background: rgba(196,30,58,0.12);  border: 1px solid rgba(196,30,58,0.35); color: #e74c3c; }
 
-    /* Butoane spin */
-    .rl-spin-controls { display: flex; flex-direction: column; gap: 8px; }
-    .rl-clear-btn { padding: 8px 16px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; font-family: 'Rajdhani', sans-serif; font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px; color: #555; cursor: pointer; transition: all 0.2s; }
+    .rl-btn-col { display: flex; flex-direction: column; gap: 8px; }
+    .rl-clear-btn { padding: 8px 14px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; font-family: 'Rajdhani', sans-serif; font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px; color: #555; cursor: pointer; transition: all 0.2s; }
     .rl-clear-btn:hover:not(:disabled) { border-color: rgba(231,76,60,0.5); color: #e74c3c; }
     .rl-clear-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-    .rl-spin-btn { padding: 13px; background: linear-gradient(135deg,#8B0000,#C41E3A); color: white; border: none; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 4px; cursor: pointer; transition: all 0.2s; box-shadow: 0 6px 20px rgba(196,30,58,0.4); display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .rl-spin-btn { padding: 14px; background: linear-gradient(135deg,#8B0000,#C41E3A); color: white; border: none; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 4px; cursor: pointer; transition: all 0.2s; box-shadow: 0 6px 20px rgba(196,30,58,0.4); display: flex; align-items: center; justify-content: center; gap: 10px; }
     .rl-spin-btn:hover:not(:disabled):not(.spin-off) { background: linear-gradient(135deg,#C41E3A,#e8203d); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(196,30,58,0.6); }
-    .rl-spin-btn:disabled, .rl-spin-btn.spin-off { opacity: 0.35; cursor: not-allowed; transform: none; background: #2a2a2a; box-shadow: none; }
-    .spin-rot { animation: spinRot 0.5s linear infinite; display: inline-block; }
+    .rl-spin-btn.spin-off, .rl-spin-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; background: #222; box-shadow: none; }
     .rl-error { color: #e74c3c; font-size: 0.8rem; }
 
-    /* ── MASA PARIURI ────────────────────────────────────────────────────── */
-    .rl-table {
-        width: 100%; max-width: 820px;
-        background: #0e2a0e;
-        border: 1px solid rgba(212,175,55,0.2);
-        border-radius: 10px;
-        padding: 12px;
-        box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
-    }
-
-    /* Rand zero */
-    .rl-zero-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: stretch; }
-    .cell-zero {
-        width: 54px; min-height: 80px;
-        background: #27ae60;
-        border: 1px solid rgba(255,255,255,0.2);
-        border-radius: 6px; cursor: pointer;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 4px; position: relative; transition: all 0.15s;
-        flex-shrink: 0;
-    }
-    .cell-zero:hover { background: #2ecc71; transform: scale(1.04); }
-    .rl-col-labels { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-    .rl-col-lbl {
-        flex: 1; background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.2);
-        border-radius: 4px; display: flex; align-items: center; justify-content: center;
-        font-size: 0.75rem; font-weight: 700; letter-spacing: 1px; color: #D4AF37;
-        cursor: pointer; transition: all 0.15s;
-    }
-    .rl-col-lbl:hover { background: rgba(212,175,55,0.15); }
-
-    /* Grid numere */
-    .rl-numbers-grid { display: flex; gap: 4px; margin-bottom: 6px; }
-    .rl-number-col   { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-
-    /* Celula numar */
-    .rl-cell {
-        position: relative;
-        min-height: 52px;
-        border-radius: 5px;
-        cursor: pointer;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 2px;
-        border: 1px solid rgba(255,255,255,0.08);
-        transition: all 0.12s;
-        user-select: none;
-    }
-    .rl-cell:hover { transform: scale(1.06); z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.6); }
-    .cell-red   { background: linear-gradient(160deg, #7d1818, #5a0f0f); }
-    .cell-red:hover { background: linear-gradient(160deg, #c0392b, #922b21); }
-    .cell-black { background: linear-gradient(160deg, #1a1a1a, #111); }
-    .cell-black:hover { background: linear-gradient(160deg, #2a2a2a, #1a1a1a); }
-
-    /* Celula unde a cazut bila */
-    .cell-hit {
-        animation: cellHit 1s ease-in-out infinite alternate;
-        border-color: #D4AF37 !important;
-        z-index: 3;
-    }
-    @@keyframes cellHit {
-        from { box-shadow: 0 0 8px rgba(212,175,55,0.4); }
-        to   { box-shadow: 0 0 20px rgba(212,175,55,0.9); }
-    }
-    .cell-has-bet { border-color: rgba(212,175,55,0.5) !important; }
-    .cell-num { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 1px; color: rgba(255,255,255,0.9); line-height: 1; }
-
-    /* Jetonul de pe celula */
-    .cell-chip {
-        width: 20px; height: 20px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 0.55rem; font-weight: 700; color: white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.6);
-        position: absolute; bottom: 3px; right: 3px;
-    }
-
-    /* Duzine */
-    .rl-dozens { display: flex; gap: 4px; margin-bottom: 4px; }
-    /* Outside bets */
-    .rl-outside { display: flex; gap: 4px; }
-    .rl-outside-cell {
-        flex: 1; padding: 10px 6px;
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 5px;
-        text-align: center;
-        font-size: 0.78rem; font-weight: 700; letter-spacing: 1px;
-        cursor: pointer; transition: all 0.15s; color: #888;
-    }
-    .rl-outside-cell:hover { background: rgba(255,255,255,0.08); color: #f0e6d3; }
+    /* ── MASA ── */
+    .rl-betting-table { width: 100%; max-width: 840px; background: #0c220c; border: 1px solid rgba(212,175,55,0.2); border-radius: 10px; padding: 10px; box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 5px; }
+    .rl-top-row  { display: flex; gap: 5px; align-items: stretch; margin-bottom: 2px; }
+    .rl-col-btns { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    .rl-col-btn  { flex: 1; background: rgba(212,175,55,0.06); border: 1px solid rgba(212,175,55,0.18); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; letter-spacing: 1px; color: rgba(212,175,55,0.6); cursor: pointer; transition: all 0.15s; }
+    .rl-col-btn:hover     { background: rgba(212,175,55,0.14); color: #D4AF37; }
+    .rl-col-btn.col-has-bet { border-color: rgba(212,175,55,0.5); color: #D4AF37; background: rgba(212,175,55,0.1); }
+    .cell-zero { width: 48px; background: linear-gradient(160deg,#145a14,#1e8449); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; position: relative; transition: all 0.15s; flex-shrink: 0; }
+    .cell-zero:hover { background: linear-gradient(160deg,#1e8449,#27ae60); transform: scale(1.04); }
+    .rl-numbers-grid { display: flex; gap: 3px; }
+    .rl-num-col { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+    .rl-cell { position: relative; min-height: 50px; border-radius: 5px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.07); transition: all 0.12s; user-select: none; }
+    .rl-cell:hover    { transform: scale(1.07); z-index: 2; box-shadow: 0 4px 14px rgba(0,0,0,0.7); }
+    .cell-red         { background: linear-gradient(160deg,#6b1212,#4a0d0d); }
+    .cell-red:hover   { background: linear-gradient(160deg,#c0392b,#922b21); }
+    .cell-black       { background: linear-gradient(160deg,#181818,#0e0e0e); }
+    .cell-black:hover { background: linear-gradient(160deg,#2a2a2a,#1a1a1a); }
+    .cell-hit         { animation: cellHit 0.8s ease-in-out infinite alternate; border-color: #D4AF37 !important; z-index: 3; }
+    @@keyframes cellHit { from { box-shadow:0 0 6px rgba(212,175,55,0.4); } to { box-shadow:0 0 22px rgba(212,175,55,1); } }
+    .cell-has-bet     { border-color: rgba(212,175,55,0.5) !important; }
+    .cell-num         { font-family:'Bebas Neue',sans-serif; font-size:0.95rem; letter-spacing:1px; color:rgba(255,255,255,0.9); line-height:1; }
+    .cell-chip        { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.5rem; font-weight:700; color:white; box-shadow:0 2px 4px rgba(0,0,0,0.6); position:absolute; bottom:2px; right:2px; }
+    .rl-dozens, .rl-outside { display: flex; gap: 4px; }
+    .rl-outside-cell { flex: 1; padding: 9px 4px; text-align: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 5px; font-size: 0.72rem; font-weight: 700; letter-spacing: 1px; color: #666; cursor: pointer; transition: all 0.15s; }
+    .rl-outside-cell:hover { background: rgba(255,255,255,0.09); color: #f0e6d3; }
     .rl-outside-cell.ob-active { border-color: rgba(212,175,55,0.5); color: #D4AF37; background: rgba(212,175,55,0.08); }
-    .ob-red   { background: rgba(196,30,58,0.12); color: #e74c3c; border-color: rgba(196,30,58,0.3); }
-    .ob-red:hover { background: rgba(196,30,58,0.22); }
-    .ob-black { background: rgba(30,30,30,0.5); color: #aaa; }
-    .ob-black:hover { background: rgba(50,50,50,0.7); }
-    .ob-even, .ob-odd { color: #888; }
+    .ob-red   { background: rgba(196,30,58,0.1);  color: #c0392b; border-color: rgba(196,30,58,0.25); }
+    .ob-red:hover   { background: rgba(196,30,58,0.2); color: #e74c3c; }
+    .ob-black { background: rgba(20,20,20,0.6);   color: #888; }
+    .ob-black:hover { background: rgba(40,40,40,0.8); color: #aaa; }
 
-    /* ── ISTORIC ─────────────────────────────────────────────────────────── */
-    .rl-history { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
-    .rl-hist-lbl { font-size: 0.65rem; letter-spacing: 2px; color: #444; font-weight: 700; }
-    .rl-hist-num {
-        width: 28px; height: 28px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem;
-        border: 1px solid rgba(255,255,255,0.1);
-    }
-    .hn-green { background: #1e5c1e; color: #2ecc71; }
-    .hn-red   { background: #5c1e1e; color: #e74c3c; }
-    .hn-black { background: #1a1a1a; color: #888; }
+    .rl-history { display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:center; }
+    .rl-hist-lbl { font-size:0.62rem; letter-spacing:2px; color:#333; font-weight:700; }
+    .rl-hist-num { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Bebas Neue',sans-serif; font-size:0.82rem; border:1px solid rgba(255,255,255,0.08); }
+    .hn-green { background:#163c16; color:#2ecc71; }
+    .hn-red   { background:#3c1616; color:#e74c3c; }
+    .hn-black { background:#1a1a1a; color:#777; }
 
     @@media (max-width: 600px) {
-        .rl-wheel { width: 170px; height: 170px; }
-        .rl-wheel-center { width: 60px; height: 60px; }
-        .lr-number { font-size: 2rem; }
+        .rl-wheel-outer { width: 200px; height: 200px; }
         .rl-cell { min-height: 40px; }
-        .cell-num { font-size: 0.85rem; }
+        .cell-num { font-size: 0.8rem; }
+        .rl-outside-cell { font-size: 0.65rem; padding: 7px 2px; }
+    }
+    
+    /* ── BILA ── */
+    .rl-ball-container {
+        position: absolute;
+        inset: 0; 
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 15;
+        /* 🟢 Animația fluidă pentru bilă */
+        transition: transform 4.5s cubic-bezier(0.15, 0.65, 0.1, 1.0); 
+    }
+
+    .rl-ball {
+        position: absolute;
+        top: 24px; 
+        left: 50%;
+        transform: translateX(-50%);
+        width: 12px;
+        height: 12px;
+        background: radial-gradient(circle at 35% 35%, #ffffff, #d4d4d4 40%, #737373 80%);
+        border-radius: 50%;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.8), inset -1px -1px 3px rgba(0,0,0,0.5);
     }
 </style>

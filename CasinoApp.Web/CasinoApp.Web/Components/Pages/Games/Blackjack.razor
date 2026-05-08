@@ -16,6 +16,7 @@
                 int ci = i;
                 bool hide = ci == 1 && gameState == GameState.Playing;
                 <div class="bj-card @(GetColorClass(dealerHand[ci])) @(hide ? "card-back" : "")"
+                     @key="@($"d{ci}r{roundKey}")"
                      style="--di:@ci">
                     @if (!hide)
                     {
@@ -66,6 +67,7 @@
             {
                 int ci = i;
                 <div class="bj-card @(GetColorClass(playerHand[ci]))"
+                     @key="@($"p{ci}r{roundKey}")"
                      style="--di:@(ci + 10)">
                     <span class="cr">@playerHand[ci].Rank</span>
                     <span class="cs-tl">@playerHand[ci].Suit</span>
@@ -179,6 +181,7 @@
     private List<Card>  deck       = new();
     private List<Card>  playerHand = new();
     private List<Card>  dealerHand = new();
+    private int         roundKey   = 0;
 
     // ── Pariu ─────────────────────────────────────────────────────────────
     private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
@@ -245,6 +248,7 @@
         playerHand.Add(Draw()); dealerHand.Add(Draw());
 
         gameState = GameState.Playing;
+        roundKey++;
 
         if (GetHandValue(playerHand) == 21) EndGame();
     }
