@@ -348,9 +348,14 @@
         lastResult = wheelOrder[resIdx]; // Numărul câștigător
 
         // 1. CALCULĂM ROTAȚIA ROȚII (Sens Orar)
-        double segDeg = 360.0 / wheelOrder.Length;
-        double extraSpins = (6 + rng.Next(0, 4)) * 360;
-        double target = extraSpins + ((wheelOrder.Length - resIdx) * segDeg);
+        double segDeg       = 360.0 / wheelOrder.Length;
+        double extraSpins   = (6 + rng.Next(0, 4)) * 360;
+
+        double currentNorm  = currentWheelDeg % 360;
+        double winningAngle = (wheelOrder.Length - resIdx) * segDeg;
+        double adjustment   = (winningAngle - currentNorm + 360) % 360;
+        double target       = extraSpins + adjustment;
+
         currentWheelDeg += target;
 
         // 2. CALCULĂM ROTAȚIA BILEI (Sens Invers / Negativ)
