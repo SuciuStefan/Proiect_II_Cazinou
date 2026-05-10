@@ -49,37 +49,132 @@
     @* ── BANNER REZULTAT ─────────────────────────────────────────────────── *@
     @if (gameState == GameState.Result)
     {
-        <div class="bj-result @GetResultClass()">
+        <div class="bj-result @GetResultClass(resultMsg)">
             <span class="res-msg">@resultMsg</span>
             @if (resultWin != 0)
             {
                 <span class="res-amt">@(resultWin > 0 ? "+" : "")@resultWin.ToString("F2") RON</span>
             }
         </div>
+        @* Banner separat pentru mana split *@
+        @if (hasSplit && !string.IsNullOrEmpty(splitResultMsg))
+        {
+            <div class="bj-result @GetResultClass(splitResultMsg)" style="font-size:0.85em; padding:6px 20px;">
+                <span class="res-msg" style="font-size:1.1rem">MANA 2: @splitResultMsg</span>
+                @if (splitResultWin != 0)
+                {
+                    <span class="res-amt" style="font-size:0.9rem">@(splitResultWin > 0 ? "+" : "")@splitResultWin.ToString("F2") RON</span>
+                }
+            </div>
+        }
+    }
+
+    @* ── INSURANCE PROMPT — apare cand dealer arata As ───────────────────── *@
+    @if (isOfferingInsurance)
+    {
+        <div class="bj-insurance-prompt">
+            <span class="ins-label">DEALER ARATA AS — ASIGURARE?</span>
+            <span class="ins-sub">Pariezi @(Math.Floor(currentBet / 2).ToString("0")) RON ca dealer-ul are Blackjack (plateste 2:1)</span>
+            <div class="ins-btns">
+                <button class="bj-btn stand" @onclick="TakeInsurance"
+                        disabled="@(Session.CurrentPlayer!.Balance < (double)Math.Floor(currentBet / 2))">
+                    DA (@(Math.Floor(currentBet / 2).ToString("0")) RON)
+                </button>
+                <button class="bj-btn hit" @onclick="DeclineInsurance">NU</button>
+            </div>
+        </div>
     }
 
     @* ── PLAYER ──────────────────────────────────────────────────────────── *@
     <div class="bj-zone player-zone">
-        <div class="bj-hand">
-            @for (int i = 0; i < playerHand.Count; i++)
+
+        @if (hasSplit)
+        {
+            @* Doua maini side-by-side la split *@
+            <div class="bj-split-hands">
+
+                @* Mana 1 — mana principala *@
+                <div class="bj-split-slot @(!isPlayingSplitHand && gameState == GameState.Playing ? "slot-active" : "slot-inactive")">
+                    <div class="split-hand-label">
+                        MANA 1 @(!isPlayingSplitHand && gameState == GameState.Playing ? "◄" : "")
+                    </div>
+                    <div class="bj-hand">
+                        @for (int i = 0; i < playerHand.Count; i++)
+                        {
+                            int ci = i;
+                            <div class="bj-card @(GetColorClass(playerHand[ci]))"
+                                 @key="@($"p{ci}r{roundKey}")"
+                                 style="--di:@(ci + 10)">
+                                <span class="cr">@playerHand[ci].Rank</span>
+                                <span class="cs-tl">@playerHand[ci].Suit</span>
+                                <span class="cs-c">@playerHand[ci].Suit</span>
+                                <span class="cs-br">@playerHand[ci].Suit</span>
+                            </div>
+                        }
+                    </div>
+                    @if (playerHand.Count > 0)
+                    {
+                        int pv = GetHandValue(playerHand);
+                        <div class="bj-score @(pv > 21 ? "score-bust" : "")">
+                            @pv @(pv > 21 ? "— BUST" : "")
+                        </div>
+                    }
+                </div>
+
+                @* Mana 2 — mana split *@
+                <div class="bj-split-slot @(isPlayingSplitHand && gameState == GameState.Playing ? "slot-active" : "slot-inactive")">
+                    <div class="split-hand-label">
+                        MANA 2 @(isPlayingSplitHand && gameState == GameState.Playing ? "◄" : "")
+                    </div>
+                    <div class="bj-hand">
+                        @for (int i = 0; i < splitHand.Count; i++)
+                        {
+                            int ci = i;
+                            <div class="bj-card @(GetColorClass(splitHand[ci]))"
+                                 @key="@($"s{ci}r{roundKey}")"
+                                 style="--di:@(ci + 20)">
+                                <span class="cr">@splitHand[ci].Rank</span>
+                                <span class="cs-tl">@splitHand[ci].Suit</span>
+                                <span class="cs-c">@splitHand[ci].Suit</span>
+                                <span class="cs-br">@splitHand[ci].Suit</span>
+                            </div>
+                        }
+                    </div>
+                    @if (splitHand.Count > 0)
+                    {
+                        int sv = GetHandValue(splitHand);
+                        <div class="bj-score @(sv > 21 ? "score-bust" : "")">
+                            @sv @(sv > 21 ? "— BUST" : "")
+                        </div>
+                    }
+                </div>
+
+            </div>
+        }
+        else
+        {
+            @* Mana normala — o singura mana *@
+            <div class="bj-hand">
+                @for (int i = 0; i < playerHand.Count; i++)
+                {
+                    int ci = i;
+                    <div class="bj-card @(GetColorClass(playerHand[ci]))"
+                         @key="@($"p{ci}r{roundKey}")"
+                         style="--di:@(ci + 10)">
+                        <span class="cr">@playerHand[ci].Rank</span>
+                        <span class="cs-tl">@playerHand[ci].Suit</span>
+                        <span class="cs-c">@playerHand[ci].Suit</span>
+                        <span class="cs-br">@playerHand[ci].Suit</span>
+                    </div>
+                }
+            </div>
+            @if (playerHand.Count > 0)
             {
-                int ci = i;
-                <div class="bj-card @(GetColorClass(playerHand[ci]))"
-                     @key="@($"p{ci}r{roundKey}")"
-                     style="--di:@(ci + 10)">
-                    <span class="cr">@playerHand[ci].Rank</span>
-                    <span class="cs-tl">@playerHand[ci].Suit</span>
-                    <span class="cs-c">@playerHand[ci].Suit</span>
-                    <span class="cs-br">@playerHand[ci].Suit</span>
+                int pv = GetHandValue(playerHand);
+                <div class="bj-score @(pv > 21 ? "score-bust" : "")">
+                    @pv @(pv > 21 ? "— BUST" : "")
                 </div>
             }
-        </div>
-        @if (playerHand.Count > 0)
-        {
-            int pv = GetHandValue(playerHand);
-            <div class="bj-score @(pv > 21 ? "score-bust" : "")">
-                @pv @(pv > 21 ? "— BUST" : "")
-            </div>
         }
 
     </div>
@@ -93,14 +188,22 @@
             <span class="bj-bal-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
         </div>
 
-        @* Butoane HIT/STAND/2x — vizibile doar in joc *@
-        @if (gameState == GameState.Playing)
+        @* Carti ramase — indicator pachet *@
+        <div class="bj-bal" style="margin-top:-8px">
+            <span class="bj-bal-lbl">CARTI RAMASE</span>
+            <span class="bj-bal-val" style="font-size:0.9rem; color:#666;">@deck.Count / 312</span>
+        </div>
+
+        @* Butoane HIT/STAND/2x/SPLIT — vizibile doar in joc, nu si la insurance *@
+        @if (gameState == GameState.Playing && !isOfferingInsurance)
         {
             <div class="bj-sidebar-actions">
                 <button class="bj-btn hit"   @onclick="Hit"   disabled="@isDealerPlaying">HIT</button>
                 <button class="bj-btn stand" @onclick="Stand" disabled="@isDealerPlaying">STAND</button>
                 <button class="bj-btn dbl @(!CanDouble() ? "off" : "")"
                         @onclick="DoubleDown" disabled="@(!CanDouble())">2×</button>
+                <button class="bj-btn split-btn @(!CanSplit() ? "off" : "")"
+                        @onclick="DoSplit" disabled="@(!CanSplit())">SPLIT</button>
             </div>
         }
 
@@ -110,8 +213,8 @@
             <div class="bj-sidebar-actions">
                 <button class="bj-ctrl clear" @onclick="ClearBet" disabled="@(currentBet == 0 || isResetting)">✕ STERGE</button>
                 <button class="bj-ctrl rebet" @onclick="Rebet"
-                        disabled="@(lastBet == 0 || Session.CurrentPlayer!.Balance < lastBet || isResetting)">
-                    ↺ REBET (@lastBet RON)
+                        disabled="@(lastBet == 0 || Session.CurrentPlayer!.Balance < (double)lastBet || isResetting)">
+                    ↺ REBET (@lastBet.ToString("0") RON)
                 </button>
                 <button class="bj-deal @(currentBet == 0 || isResetting ? "deal-off" : "")"
                         @onclick="Deal" disabled="@(currentBet == 0 || isResetting)">
@@ -135,7 +238,7 @@
             <div class="bj-chip-stack-wrap">
                 @if (currentBet > 0 && !isResetting)
                 {
-                    var columns = GetChipColumns(currentBet);
+                    var columns = GetChipColumns((int)currentBet);
                     <div class="bj-chip-cols">
                         @foreach (var col in columns)
                         {
@@ -181,45 +284,63 @@
     private enum GameState { Betting, Playing, Result }
 
     // ── Stare joc ─────────────────────────────────────────────────────────
-    private GameState   gameState  = GameState.Betting;
-    private List<Card>  deck       = new();
-    private List<Card>  playerHand = new();
-    private List<Card>  dealerHand = new();
-    private int         roundKey   = 0;
+    private GameState  gameState  = GameState.Betting;
+    private List<Card> deck       = new();
+    private List<Card> playerHand = new();
+    private List<Card> dealerHand = new();
+    private int        roundKey   = 0;
 
-    // ── Pariu ─────────────────────────────────────────────────────────────
+    // ── Pariu — decimal in loc de int (bani = precizie) ───────────────────
     private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
-    private int    currentBet = 0;
-    private int    lastBet    = 0;
+    private decimal currentBet  = 0;
+    private decimal lastBet     = 0;
+    private decimal originalBet = 0; // pariul inainte de double/split, folosit la rebet
+
+    // ── Split ─────────────────────────────────────────────────────────────
+    private List<Card> splitHand          = new();
+    private decimal    splitBet           = 0;
+    private bool       hasSplit           = false;
+    private bool       isPlayingSplitHand = false; // false = mana principala activa
+    private bool       mainHandDone       = false;  // mana principala a terminat
+    private string     splitResultMsg     = "";
+    private decimal    splitResultWin     = 0;
+
+    // ── Insurance (asigurare) ─────────────────────────────────────────────
+    private bool    isOfferingInsurance = false;
+    private decimal insuranceBet        = 0;
 
     // ── Rezultat ──────────────────────────────────────────────────────────
-    private string errorMsg    = "";
-    private string resultMsg   = "";
-    private double resultWin   = 0;
-    private bool   isResetting    = false;
-    private bool   isDealerPlaying = false;
+    private string  errorMsg        = "";
+    private string  resultMsg       = "";
+    private decimal resultWin       = 0;
+    private bool    isResetting     = false;
+    private bool    isDealerPlaying = false;
+
+    // ── CancellationToken — protejeaza ResetAfterDelayAsync la Dispose ────
+    private CancellationTokenSource? _resetCts;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += OnSessionChanged;
+        BuildDeck(); // pachetul se construieste o singura data la pornire
     }
 
-    private void OnSessionChanged()
-    {
-        InvokeAsync(StateHasChanged);
-    }
+    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
 
     public void Dispose()
     {
         Session.OnChange -= OnSessionChanged;
+        // Anuleaza orice reset in asteptare — previne StateHasChanged pe component mort
+        _resetCts?.Cancel();
+        _resetCts?.Dispose();
     }
 
     // ── Jetoane ───────────────────────────────────────────────────────────
     private void AddChip(int v)
     {
         if (isResetting) return;
-        if (Session.CurrentPlayer!.Balance < currentBet + v)
+        if (Session.CurrentPlayer!.Balance < (double)(currentBet + v))
         {
             errorMsg = "Balanta insuficienta!";
             return;
@@ -233,23 +354,42 @@
     private void Rebet()
     {
         if (isResetting) return;
-        if (Session.CurrentPlayer!.Balance < lastBet) return;
+        if (Session.CurrentPlayer!.Balance < (double)lastBet) return;
         currentBet = lastBet;
         errorMsg   = "";
     }
 
     // ── DEAL ──────────────────────────────────────────────────────────────
-    private void Deal()
+    private async Task Deal()
     {
         if (isResetting) return;
-        if (currentBet == 0 || Session.CurrentPlayer!.Balance < currentBet) return;
+        if (currentBet == 0 || Session.CurrentPlayer!.Balance < (double)currentBet) return;
 
-        var balAfterBet = Session.CurrentPlayer.Balance - currentBet;
+        // Reseteaza starea completa de la runda anterioara
+        hasSplit            = false;
+        isPlayingSplitHand  = false;
+        mainHandDone        = false;
+        splitHand           = new();
+        splitBet            = 0;
+        splitResultMsg      = "";
+        splitResultWin      = 0;
+        insuranceBet        = 0;
+        isOfferingInsurance = false;
+        isDealerPlaying     = false;
+
+        // Retine pariul original pentru rebet (inainte de eventuale double/split)
+        originalBet = currentBet;
+
+        // Deduce pariul din balanta
+        var balAfterBet = Session.CurrentPlayer.Balance - (double)currentBet;
         Session.UpdateBalance(balAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
 
         errorMsg = "";
-        BuildDeck();
+
+        // ── Pachet: reshuffle daca mai sunt sub 25% carti (~78 din 312) ──
+        if (deck.Count < 78) BuildDeck();
+
         playerHand = new(); dealerHand = new();
 
         playerHand.Add(Draw()); dealerHand.Add(Draw());
@@ -258,82 +398,239 @@
         gameState = GameState.Playing;
         roundKey++;
 
-        if (GetHandValue(playerHand) == 21) EndGame();
+        // ── PEEK: dealer arata As → ofera insurance (jucatorul decide primul) ──
+        if (dealerHand[0].Rank == "A")
+        {
+            isOfferingInsurance = true;
+            await InvokeAsync(StateHasChanged);
+            return; // Fluxul continua in TakeInsurance / DeclineInsurance
+        }
+
+        // ── PEEK: dealer arata 10/J/Q/K → peek silentios, fara insurance ──
+        if (dealerHand[0].Value == 10)
+        {
+            bool dealerBJ = GetHandValue(dealerHand) == 21;
+            if (dealerBJ)
+            {
+                // Dealer are BJ — dezvaluie si termina runda imediat
+                isDealerPlaying = true;
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(700);
+                EndGame();
+                return;
+            }
+        }
+
+        // ── Player BJ? (dealer nu are BJ la acest punct) ──
+        if (GetHandValue(playerHand) == 21)
+        {
+            EndGame();
+            return;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // ── INSURANCE ─────────────────────────────────────────────────────────
+    private async Task TakeInsurance()
+    {
+        decimal insuranceAmount = Math.Floor(currentBet / 2);
+        if (Session.CurrentPlayer!.Balance < (double)insuranceAmount)
+        {
+            // Nu are bani — trateaza ca decline
+            isOfferingInsurance = false;
+            await AfterInsuranceDecision();
+            return;
+        }
+
+        insuranceBet = insuranceAmount;
+        var bal = Session.CurrentPlayer.Balance - (double)insuranceBet;
+        Session.UpdateBalance(bal);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, bal);
+
+        isOfferingInsurance = false;
+        await AfterInsuranceDecision();
+    }
+
+    private async Task DeclineInsurance()
+    {
+        insuranceBet        = 0;
+        isOfferingInsurance = false;
+        await AfterInsuranceDecision();
+    }
+
+    private async Task AfterInsuranceDecision()
+    {
+        // Acum facem peek-ul efectiv
+        bool dealerBJ = GetHandValue(dealerHand) == 21;
+        bool playerBJ = GetHandValue(playerHand) == 21 && playerHand.Count == 2;
+
+        if (dealerBJ)
+        {
+            // Dezvaluie carta ascunsa a dealer-ului
+            isDealerPlaying = true;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(700);
+            EndGame();
+            return;
+        }
+
+        // Dealer nu are BJ — insurance pierduta (deja dedusa din balanta)
+        if (playerBJ)
+        {
+            // Player BJ, dealer fara BJ — castig instant
+            EndGame();
+            return;
+        }
+
+        // Joc normal
+        await InvokeAsync(StateHasChanged);
     }
 
     // ── HIT ───────────────────────────────────────────────────────────────
-    private void Hit()
+    private async Task Hit()
     {
-        if (isDealerPlaying) return;
-        playerHand.Add(Draw());
-        if (GetHandValue(playerHand) >= 21) EndGame();
+        if (isDealerPlaying || isOfferingInsurance) return;
+
+        if (isPlayingSplitHand)
+        {
+            splitHand.Add(Draw());
+            if (GetHandValue(splitHand) >= 21)
+                await DealerPlay(); // Mana split terminata, dealer joaca
+        }
+        else
+        {
+            playerHand.Add(Draw());
+            int pv = GetHandValue(playerHand);
+            if (pv >= 21)
+            {
+                if (hasSplit && !mainHandDone)
+                    await SwitchToSplitHand(); // Trece la mana a doua
+                else
+                    EndGame();
+            }
+        }
     }
 
     // ── STAND ─────────────────────────────────────────────────────────────
-    private async Task Stand() => await DealerPlay();
+    private async Task Stand()
+    {
+        if (isOfferingInsurance) return;
+
+        if (hasSplit && !isPlayingSplitHand && !mainHandDone)
+            await SwitchToSplitHand(); // Stand pe mana 1 → trece la mana 2
+        else
+            await DealerPlay();
+    }
 
     // ── DOUBLE DOWN ───────────────────────────────────────────────────────
     private bool CanDouble() =>
-        !isDealerPlaying && playerHand.Count == 2 && Session.CurrentPlayer!.Balance >= currentBet;
+        !isDealerPlaying && !isOfferingInsurance &&
+        !isPlayingSplitHand &&         // nu poti double pe mana split
+        playerHand.Count == 2 &&
+        Session.CurrentPlayer!.Balance >= (double)currentBet;
 
     private async Task DoubleDown()
     {
         if (!CanDouble()) return;
 
-        var balAfterDouble = Session.CurrentPlayer!.Balance - currentBet;
+        var balAfterDouble = Session.CurrentPlayer!.Balance - (double)currentBet;
         Session.UpdateBalance(balAfterDouble);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterDouble);
 
         currentBet *= 2;
         playerHand.Add(Draw());
 
-        if (GetHandValue(playerHand) > 21) EndGame();
-        else await DealerPlay();
+        if (hasSplit && !mainHandDone)
+            // Dupa double pe mana 1 → trece la mana 2 indiferent de rezultat
+            await SwitchToSplitHand();
+        else if (GetHandValue(playerHand) > 21)
+            EndGame();
+        else
+            await DealerPlay();
+    }
+
+    // ── SPLIT ─────────────────────────────────────────────────────────────
+    private bool CanSplit() =>
+        !isDealerPlaying && !hasSplit && !isOfferingInsurance &&
+        playerHand.Count == 2 &&
+        playerHand[0].Rank == playerHand[1].Rank &&
+        Session.CurrentPlayer!.Balance >= (double)currentBet;
+
+    private async Task DoSplit()
+    {
+        if (!CanSplit()) return;
+
+        // Deduce al doilea pariu din balanta
+        var bal = Session.CurrentPlayer!.Balance - (double)currentBet;
+        Session.UpdateBalance(bal);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, bal);
+
+        splitBet           = currentBet;
+        hasSplit           = true;
+        isPlayingSplitHand = false;
+        mainHandDone       = false;
+
+        // Muta a doua carte in mana split
+        var secondCard = playerHand[1];
+        playerHand.RemoveAt(1);
+        splitHand = new List<Card> { secondCard };
+
+        // Da cate o carte noua la fiecare mana
+        playerHand.Add(Draw());
+        splitHand.Add(Draw());
+
+        // Caz special: split de Asi — o singura carte per mana, ambele auto-stand
+        // (regula standard de cazino)
+        if (playerHand[0].Rank == "A")
+        {
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(400);
+            mainHandDone       = true;
+            isPlayingSplitHand = true;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(400);
+            await DealerPlay();
+            return;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SwitchToSplitHand()
+    {
+        mainHandDone       = true;
+        isPlayingSplitHand = true;
+        await InvokeAsync(StateHasChanged);
     }
 
     // ── DEALER JOACA ──────────────────────────────────────────────────────
     private async Task DealerPlay()
     {
-        isDealerPlaying = true;
+        isDealerPlaying    = true;
+        isPlayingSplitHand = false;
         await InvokeAsync(StateHasChanged);
 
-        bool playerBJ = GetHandValue(playerHand) == 21 && playerHand.Count == 2;
-        int pv = GetHandValue(playerHand);
+        // Dezvaluie carta ascunsa — pauza dramatica
+        await Task.Delay(1000);
+        await InvokeAsync(StateHasChanged);
 
-        if (playerBJ)
+        // Daca ambele maini ale jucatorului sunt bust, dealer nu mai trage
+        bool allBust = GetHandValue(playerHand) > 21 &&
+                       (!hasSplit || GetHandValue(splitHand) > 21);
+        if (allBust)
         {
-            // Daca jucatorul are BJ: dezvaluie imediat si incepe sa traga
-            await InvokeAsync(StateHasChanged);
-        }
-        else
-        {
-            // Altfel: asteapta 1 secunda inainte de a dezvalui
-            await Task.Delay(1000);
-            await InvokeAsync(StateHasChanged);
-
-            // Daca dupa dezvaluire dealer-ul bate deja jucatorul, end imediat
-            if (GetHandValue(dealerHand) > pv || GetHandValue(dealerHand) >= 17)
-            {
-                isDealerPlaying = false;
-                EndGame();
-                return;
-            }
+            isDealerPlaying = false;
+            EndGame();
+            return;
         }
 
-        // Trage carti una cate una la fiecare 1 secunda
+        // Dealer trage carti pana ajunge la minim 17
         while (GetHandValue(dealerHand) < 17)
         {
             await Task.Delay(1000);
             dealerHand.Add(Draw());
             await InvokeAsync(StateHasChanged);
-
-            // Daca dealer-ul bate jucatorul sau a facut bust, end imediat
-            if (GetHandValue(dealerHand) > pv || GetHandValue(dealerHand) > 21)
-            {
-                isDealerPlaying = false;
-                EndGame();
-                return;
-            }
         }
 
         isDealerPlaying = false;
@@ -345,99 +642,154 @@
     {
         int  pv       = GetHandValue(playerHand);
         int  dv       = GetHandValue(dealerHand);
-        bool playerBJ = pv == 21 && playerHand.Count == 2;
+        // BJ nu se considera dupa split (regula standard)
+        bool playerBJ = pv == 21 && playerHand.Count == 2 && !hasSplit;
         bool dealerBJ = dv == 21 && dealerHand.Count == 2;
 
-        resultWin = 0;
-        double currentBalance = Session.CurrentPlayer!.Balance;
-        double newBalance;
+        decimal currentBalance = (decimal)Session.CurrentPlayer!.Balance;
+        decimal newBalance     = currentBalance;
 
-        if (pv > 21)
+        // ── Insurance: daca dealer are BJ si jucatorul a luat asigurare ──
+        // Insurance plateste 2:1 → se returneaza miza + 2× miza = 3× insurance
+        if (insuranceBet > 0 && dealerBJ)
+            newBalance += insuranceBet * 3;
+
+        // ── Rezultat mana principala ──
+        (resultMsg, resultWin, newBalance) = ComputeHandResult(
+            pv, dv, playerBJ, dealerBJ, currentBet, newBalance
+        );
+
+        // ── Rezultat mana split (daca exista) ──
+        if (hasSplit)
         {
-            resultMsg  = "BUST — AI PIERDUT";
-            resultWin  = -currentBet;
-            newBalance = currentBalance;
-        }
-        else if (dealerBJ && !playerBJ)
-        {
-            resultMsg  = "DEALER BLACKJACK";
-            resultWin  = -currentBet;
-            newBalance = currentBalance;
-        }
-        else if (playerBJ && !dealerBJ)
-        {
-            double winAmt = currentBet * 1.5;
-            resultMsg  = "✦ BLACKJACK! ✦";
-            resultWin  = winAmt;
-            newBalance = currentBalance + currentBet + winAmt;
-            Session.UpdateBalance(newBalance);
-            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
-        }
-        else if (dv > 21)
-        {
-            resultMsg  = "DEALER BUST — AI CASTIGAT!";
-            resultWin  = currentBet;
-            newBalance = currentBalance + currentBet * 2;
-            Session.UpdateBalance(newBalance);
-            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
-        }
-        else if (pv > dv)
-        {
-            resultMsg  = "AI CASTIGAT!";
-            resultWin  = currentBet;
-            newBalance = currentBalance + currentBet * 2;
-            Session.UpdateBalance(newBalance);
-            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
-        }
-        else if (pv == dv)
-        {
-            resultMsg  = "EGALITATE — PUSH";
-            resultWin  = 0;
-            newBalance = currentBalance + currentBet;
-            Session.UpdateBalance(newBalance);
-            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
-        }
-        else
-        {
-            resultMsg  = "DEALER CASTIGA";
-            resultWin  = -currentBet;
-            newBalance = currentBalance;
+            int spv = GetHandValue(splitHand);
+            (splitResultMsg, splitResultWin, newBalance) = ComputeHandResult(
+                spv, dv, false, dealerBJ, splitBet, newBalance
+            );
         }
 
-        lastBet    = currentBet;
+        // Actualizeaza balanta o singura data, cu totalul acumulat
+        Session.UpdateBalance((double)newBalance);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, (double)newBalance);
+
+        // Salveaza pariul original pentru butonul Rebet
+        lastBet    = originalBet;
         currentBet = 0;
         gameState  = GameState.Result;
         isResetting = true;
 
-        // Reseteaza masa dupa 2 secunde
-        _ = ResetAfterDelayAsync();
+        // Anuleaza orice reset anterior si porneste unul nou cu CancellationToken
+        _resetCts?.Cancel();
+        _resetCts?.Dispose();
+        _resetCts = new CancellationTokenSource();
+        _ = ResetAfterDelayAsync(_resetCts.Token);
     }
 
-    private async Task ResetAfterDelayAsync()
+    /// <summary>
+    /// Calculeaza rezultatul unei singure maini fata de dealer.
+    /// Returneaza mesajul, castigul net si noua balanta acumulata.
+    /// </summary>
+    private static (string msg, decimal win, decimal newBalance) ComputeHandResult(
+        int pv, int dv, bool playerBJ, bool dealerBJ, decimal bet, decimal balance)
     {
-        await Task.Delay(2000);
-        playerHand  = new();
-        dealerHand  = new();
-        resultMsg   = "";
-        errorMsg    = "";
-        isResetting = false;
-        gameState   = GameState.Betting;
-        currentBet  = 0;
-        await InvokeAsync(StateHasChanged);
+        string  msg;
+        decimal win;
+        decimal nb = balance;
+
+        if (pv > 21)
+        {
+            // Jucatorul a facut bust — pariul deja dedus la deal, balanta neschimbata
+            msg = "BUST — AI PIERDUT";
+            win = -bet;
+        }
+        else if (dealerBJ && !playerBJ)
+        {
+            // Dealer Blackjack, jucatorul nu are — pierde pariul
+            msg = "DEALER BLACKJACK";
+            win = -bet;
+        }
+        else if (playerBJ && !dealerBJ)
+        {
+            // Blackjack! Plateste 3:2
+            decimal winAmt = Math.Round(bet * 1.5m, 2);
+            msg = "✦ BLACKJACK! ✦";
+            win = winAmt;
+            nb += bet + winAmt; // miza inapoi + castig
+        }
+        else if (dv > 21)
+        {
+            // Dealer bust — jucatorul castiga
+            msg = "DEALER BUST — AI CASTIGAT!";
+            win = bet;
+            nb += bet * 2; // miza inapoi + castig egal
+        }
+        else if (pv > dv)
+        {
+            // Jucatorul bate dealer-ul
+            msg = "AI CASTIGAT!";
+            win = bet;
+            nb += bet * 2;
+        }
+        else if (pv == dv)
+        {
+            // Egalitate — se returneaza miza
+            msg = "EGALITATE — PUSH";
+            win = 0;
+            nb += bet;
+        }
+        else
+        {
+            // Dealer castiga
+            msg = "DEALER CASTIGA";
+            win = -bet;
+        }
+
+        return (msg, win, nb);
+    }
+
+    private async Task ResetAfterDelayAsync(CancellationToken ct)
+    {
+        try
+        {
+            // 3 secunde la split (doua rezultate de citit), 2 secunde normal
+            await Task.Delay(hasSplit ? 3000 : 2000, ct);
+
+            playerHand          = new();
+            dealerHand          = new();
+            splitHand           = new();
+            hasSplit            = false;
+            isPlayingSplitHand  = false;
+            mainHandDone        = false;
+            splitResultMsg      = "";
+            splitResultWin      = 0;
+            insuranceBet        = 0;
+            isOfferingInsurance = false;
+            resultMsg           = "";
+            errorMsg            = "";
+            isResetting         = false;
+            gameState           = GameState.Betting;
+            currentBet          = 0;
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+            // Componenta distrusa sau navigare rapida — nu facem nimic
+        }
     }
 
     // ── DECK ──────────────────────────────────────────────────────────────
     private void BuildDeck()
     {
         deck = new();
-        var suits = new[] { "♠","♥","♦","♣" };
+        var suits = new[] { "♠", "♥", "♦", "♣" };
         var ranks = new (string R, int V)[]
         {
-            ("A",1),("2",2),("3",3),("4",4),("5",5),
-            ("6",6),("7",7),("8",8),("9",9),("10",10),
-            ("J",10),("Q",10),("K",10)
+            ("A",1),  ("2",2), ("3",3), ("4",4),  ("5",5),
+            ("6",6),  ("7",7), ("8",8), ("9",9),  ("10",10),
+            ("J",10), ("Q",10),("K",10)
         };
-        // 6 pachete ca la cazino real
+        // 6 pachete = 312 carti ca la cazino real
         for (int d = 0; d < 6; d++)
             foreach (var s in suits)
                 foreach (var r in ranks)
@@ -469,19 +821,19 @@
     private string GetColorClass(Card c) =>
         c.Suit is "♥" or "♦" ? "card-red" : "card-black";
 
-    private string GetResultClass() => resultMsg switch
+    // Acum primeste mesajul ca parametru — poate fi refolosit pentru split
+    private string GetResultClass(string msg) => msg switch
     {
         var m when m.Contains("BLACKJACK") && m.Contains("✦") => "res-bj",
-        var m when m.Contains("CASTIGAT")  => "res-win",
-        var m when m.Contains("EGALITATE") => "res-push",
-        _                                  => "res-lose"
+        var m when m.Contains("CASTIGAT")                     => "res-win",
+        var m when m.Contains("EGALITATE")                    => "res-push",
+        _                                                      => "res-lose"
     };
 
-    // Multi-column chip stack: each column holds chips of one denomination,
-    // ordered 100→50→25→10→5→1, max 10 chips per column, max 10 columns shown
+    // Multi-column chip stack
     private List<List<int>> GetChipColumns(int amount)
     {
-        var columns = new List<List<int>>();
+        var columns   = new List<List<int>>();
         int remaining = amount;
 
         foreach (var d in new[] { 100, 50, 25, 10, 5, 1 })
@@ -491,7 +843,6 @@
             if (count == 0) continue;
             remaining -= count * d;
 
-            // Split into sub-columns of 10 if needed
             while (count > 0 && columns.Count < 10)
             {
                 int take = Math.Min(count, 10);
@@ -596,7 +947,7 @@
     .bj-sidebar-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
     .bj-error { color: #e74c3c; font-size: 0.75rem; text-align: right; }
 
-    /* Butoane HIT/STAND/2x + STERGE/REBET/DEAL — toate aceeasi latime */
+    /* Butoane HIT/STAND/2x/SPLIT + STERGE/REBET/DEAL — toate aceeasi latime */
     .bj-btn, .bj-ctrl, .bj-deal {
         width: 120px; height: 44px;
         border-radius: 6px;
@@ -612,6 +963,9 @@
     .bj-btn.dbl   { background: linear-gradient(135deg,#d35400,#a04000); color: white; box-shadow: 0 4px 12px rgba(211,84,0,0.4); }
     .bj-btn.dbl:hover:not(.off) { background: linear-gradient(135deg,#e67e22,#d35400); transform: translateY(-2px); }
     .bj-btn.dbl.off { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .bj-btn.split-btn   { background: linear-gradient(135deg,#8e44ad,#6c3483); color: white; box-shadow: 0 4px 12px rgba(142,68,173,0.4); }
+    .bj-btn.split-btn:hover:not(.off) { background: linear-gradient(135deg,#9b59b6,#8e44ad); transform: translateY(-2px); }
+    .bj-btn.split-btn.off { opacity: 0.35; cursor: not-allowed; transform: none; }
     .bj-ctrl {
         background: transparent; border: 1px solid rgba(255,255,255,0.12);
         font-family: 'Rajdhani', sans-serif; font-size: 0.78rem; font-weight: 700; letter-spacing: 1.2px; color: #666;
@@ -680,6 +1034,35 @@
     .bj-chip.chip-50  { background: linear-gradient(160deg,#e67e22,#d35400); }
     .bj-chip.chip-100 { background: linear-gradient(160deg,#9b59b6,#6c3483); }
 
+    /* ── INSURANCE PROMPT ───────────────────────────────────────────────── */
+    .bj-insurance-prompt {
+        display: flex; flex-direction: column; align-items: center; gap: 8px;
+        padding: 14px 28px;
+        background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.35);
+        border-radius: 10px; margin: 8px 0;
+        animation: resPop 0.35s cubic-bezier(0.22,1,0.36,1);
+    }
+    .ins-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 3px; color: #D4AF37; }
+    .ins-sub   { font-size: 0.72rem; color: #777; letter-spacing: 0.8px; }
+    .ins-btns  { display: flex; gap: 12px; margin-top: 4px; }
+
+    /* ── SPLIT HANDS (side-by-side) ─────────────────────────────────────── */
+    .bj-split-hands {
+        display: flex; flex-direction: row; gap: 28px;
+        justify-content: center; align-items: flex-start; width: 100%;
+    }
+    .bj-split-slot {
+        display: flex; flex-direction: column; align-items: center; gap: 8px;
+        transition: opacity 0.3s ease;
+    }
+    .slot-active  { opacity: 1; }
+    .slot-inactive { opacity: 0.4; }
+    .split-hand-label {
+        font-family: 'Bebas Neue', sans-serif; font-size: 0.72rem; letter-spacing: 3px;
+        color: rgba(212,175,55,0.4);
+    }
+    .slot-active .split-hand-label { color: #D4AF37; }
+
     @@media (max-width: 600px) {
         .bj-card { width: 58px; height: 86px; }
         .cs-c { font-size: 1.5rem; }
@@ -687,5 +1070,6 @@
         .chi { font-size: 1rem; }
         .bj-sidebar { position: static; transform: none; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; width: 100%; right: unset; top: unset; }
         .bj-btn, .bj-ctrl, .bj-deal { width: 90px; }
+        .bj-split-hands { gap: 12px; }
     }
 </style>
