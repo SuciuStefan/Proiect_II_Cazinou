@@ -46,12 +46,12 @@
         </div>
 
         @* Reeluri *@
-        <div class="sl-reels-frame" @key="spinKey" >
+        <div class="sl-reels-frame" @key="spinKey">
 
-            @* Highlight payline pe randul din mijloc (payline 1) *@
+            @* Highlight payline pe randul din mijloc *@
             <div class="sl-main-line-overlay"></div>
 
-            @for (int r = 0; r < 3; r++)
+            @for (int r = 0; r < 5; r++)
             {
                 int ri = r;
                 <div class="sl-reel-col @(reelStopped[ri] && !isSpinning ? "reel-landed" : "")" id="reel-col-@ri">
@@ -65,7 +65,7 @@
                         </div>
                     }
                 </div>
-                @if (r < 2)
+                @if (r < 4)
                 {
                     <div class="sl-reel-divider"></div>
                 }
@@ -91,7 +91,7 @@
             {
                 <div class="sl-win-line-item">
                     <span class="wl-p">@wl.LineName</span>
-                    <span class="wl-sym">@wl.Symbol × 3</span>
+                    <span class="wl-sym">@wl.Symbol × @wl.MatchCount</span>
                     <span class="wl-amt">+@wl.Amount.ToString("F2") RON</span>
                 </div>
             }
@@ -110,7 +110,9 @@
         {
             <div class="sl-pay-row">
                 <span class="sl-pay-sym">@sym.Emoji</span>
-                <span class="sl-pay-mult">×@sym.Multiplier</span>
+                <span class="sl-pay-mult" title="3 la rând">@sym.Emoji × 3 = @sym.Mult3 × BET</span>
+                <span class="sl-pay-mult" title="4 la rând">@sym.Emoji × 4 = @sym.Mult4 × BET</span>
+                <span class="sl-pay-mult" title="5 la rând">@sym.Emoji × 5 = @sym.Mult5 × BET</span>
             </div>
         }
     </div>
@@ -138,18 +140,18 @@ window.slotsGame = (function() {
 
     var dotnet    = null;
     var symList   = ['🍒','🍋','🍊','🔔','⭐','💎','7️⃣'];
-    var intervals = [null, null, null];
+    // 5 role: întârzieri eșalonate pentru oprire
+    var intervals = [null, null, null, null, null];
     var spaceListenerAdded = false;
 
     function init(dotnetRef) {
         dotnet = dotnetRef;
 
-        // Adăugăm ascultătorul de Space
         if (!spaceListenerAdded) {
             window.addEventListener('keydown', function(e) {
                 if (e.code === 'Space' || e.key === ' ') {
                     if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-                        e.preventDefault(); 
+                        e.preventDefault();
                         var spinBtn = document.getElementById('spin-btn');
                         if (spinBtn && !spinBtn.disabled) {
                             spinBtn.click();
@@ -162,9 +164,10 @@ window.slotsGame = (function() {
     }
 
     function spin(dotnetObj, result) {
-        var stopDelays = [1200, 1900, 2600];
+        // 5 role, fiecare se oprește la 700ms după precedenta
+        var stopDelays = [1200, 1900, 2600, 3300, 4000];
 
-        for (var r = 0; r < 3; r++) {
+        for (var r = 0; r < 5; r++) {
             (function(ri) {
                 var col = document.getElementById('reel-col-' + ri);
                 if (col) {
@@ -181,7 +184,7 @@ window.slotsGame = (function() {
                             }
                         }
                     };
-                })(ri), 30); 
+                })(ri), 30);
 
                 setTimeout((function(reel, res) {
                     return function() {
@@ -189,7 +192,6 @@ window.slotsGame = (function() {
                         intervals[reel] = null;
 
                         var col2 = document.getElementById('reel-col-' + reel);
-
                         if (col2) {
                             col2.classList.remove('reel-spinning');
                             col2.classList.add('reel-stopping');
@@ -206,7 +208,8 @@ window.slotsGame = (function() {
                                 col2.classList.add('reel-landed');
                             }
 
-                            if (reel === 2) {
+                            // Ultima rolă (index 4) declanșează finalizarea
+                            if (reel === 4) {
                                 setTimeout(function() {
                                     if (dotnetObj) dotnetObj.invokeMethodAsync('OnSpinComplete');
                                 }, 200);
@@ -226,48 +229,57 @@ window.slotsGame = (function() {
 @code {
 
     // ── Modele ───────────────────────────────────────────────────────────
-    private record SymbolDef(string Emoji, int Weight, double Multiplier);
-    private record WinLine(string LineName, string Symbol, double Amount, int PaylineIndex);
+    // Mult3/Mult4/Mult5 = multiplicator pentru 3, 4 sau 5 simboluri identice de la stânga
+    private record SymbolDef(string Emoji, int Weight, double Mult3, double Mult4, double Mult5);
+    private record WinLine(string LineName, string Symbol, double Amount, int PaylineIndex, int MatchCount);
 
     // ── Simboluri ────────────────────────────────────────────────────────
+    // Greutăți ajustate în funcție de raritate vs valoarea din paytable:
+    //   🍒🍋🍊 sunt comune (câștig mic), 🔔 mediu, ⭐ mai rar, 💎 rar, 7️⃣ foarte rar
     private readonly List<SymbolDef> symbols = new()
     {
-        new("🍒", 30, 2),
-        new("🍋", 25, 3),
-        new("🍊", 20, 5),
-        new("🔔", 14, 8),
-        new("⭐",  7, 15),
-        new("💎",  3, 40),
-        new("7️⃣",  1, 100),
+        new("🍒", 32, 3,  5,  10),
+        new("🍋", 28, 3,  5,  10),
+        new("🍊", 24, 3,  5,  10),
+        new("⭐",  6, 2,  5,  15),
+        new("🔔", 12, 5,  10, 25),
+        new("💎",  2, 10, 25, 50),
+        new("7️⃣",  1, 25, 100, 200),
     };
 
-    // ── Paylines: [reel0row, reel1row, reel2row] ─────────────────────────
-    // Fiecare payline = indexul de rand (0=sus, 1=mijloc, 2=jos) pentru fiecare reel
+    // ── Paylines: [row for reel0, row for reel1, row for reel2, row for reel3, row for reel4]
+    // Rows: 0=top, 1=middle, 2=bottom
+    //
+    // P1 – middle full row:      m21, m22, m23, m24, m25  → all row 1
+    // P2 – top full row:         m11, m12, m13, m14, m15  → all row 0
+    // P3 – bottom full row:      m31, m32, m33, m34, m35  → all row 2
+    // P4 – V-shape: m13,m22,m31,m42,m53 → rows: 2,1,0,1,2  (col1=row2, col2=row1, col3=row0, col4=row1, col5=row2)
+    // P5 – Λ-shape: m11,m22,m33,m42,m51 → rows: 0,1,2,1,0  (col1=row0, col2=row1, col3=row2, col4=row1, col5=row0)
     private readonly int[][] paylines = new[]
     {
-        new[] { 1, 1, 1 },   // P1 – mijloc (principal)
-        new[] { 0, 0, 0 },   // P2 – sus
-        new[] { 2, 2, 2 },   // P3 – jos
-        new[] { 0, 1, 2 },   // P4 – diagonala ↘
-        new[] { 2, 1, 0 },   // P5 – diagonala ↗
+        new[] { 0, 0, 0, 0, 0 },   // P1 – mijloc
+        new[] { 1, 1, 1, 1, 1 },   // P2 – sus
+        new[] { 2, 2, 2, 2, 2 },   // P3 – jos
+        new[] { 2, 1, 0, 1, 2 },   // P4 – V shape (m13,m22,m31,m42,m53)
+        new[] { 0, 1, 2, 1, 0 },   // P5 – Λ shape (m11,m22,m33,m42,m51)
     };
 
-    private readonly string[] paylineNames = { "P1 Mijloc", "P2 Sus", "P3 Jos", "P4 Diag↘", "P5 Diag↗" };
+    private readonly string[] paylineNames = { "P1 Sus", "P2 Mijloc", "P3 Jos", "P4 V-shape", "P5 Λ-shape" };
 
     // ── Stare ────────────────────────────────────────────────────────────
-    private string[,] resultGrid  = new string[3, 3]; // [reel, row]
-    private string[,] displayGrid = new string[3, 3];
-    private List<WinLine>  winLines      = new();
+    private string[,] resultGrid  = new string[5, 3]; // [reel, row]
+    private string[,] displayGrid = new string[5, 3];
+    private List<WinLine>  winLines       = new();
     private List<int>      activePaylines = new();
     private HashSet<int>   winCells       = new();
     private double         totalWin       = 0;
     private bool           isSpinning     = false;
-    private bool[]         reelStopped    = { false, false, false };
+    private bool[]         reelStopped    = new bool[5];
     private string         errorMsg       = "";
-    private Guid           spinKey        = Guid.NewGuid(); // Pentru a forța re-render pe JS
+    private Guid           spinKey        = Guid.NewGuid();
 
     // ── Pariu ────────────────────────────────────────────────────────────
-    private readonly int[] betOptions = { 1, 5, 10, 25 };
+    private readonly int[] betOptions = { 1, 5, 10, 25, 50, 100 };
     private int betAmount = 1;
 
     // ── JS interop ───────────────────────────────────────────────────────
@@ -276,9 +288,8 @@ window.slotsGame = (function() {
     protected override void OnInitialized()
     {
         dotnetRef = DotNetObjectReference.Create(this);
-        // Grila initiala de display
         var rng = new Random();
-        for (int r = 0; r < 3; r++)
+        for (int r = 0; r < 5; r++)
             for (int row = 0; row < 3; row++)
                 displayGrid[r, row] = symbols[rng.Next(symbols.Count)].Emoji;
     }
@@ -289,7 +300,6 @@ window.slotsGame = (function() {
             await JS.InvokeVoidAsync("slotsGame.init", dotnetRef);
     }
 
-    // ── Schimba pariul ────────────────────────────────────────────────────
     private void SetBet(int b)
     {
         if (isSpinning) return;
@@ -313,43 +323,34 @@ window.slotsGame = (function() {
         activePaylines = new();
         winCells = new();
         totalWin = 0;
-        reelStopped = new bool[] { false, false, false };
+        reelStopped = new bool[5];
 
-        // Scade pariul
         var newBalanceAfterBet = Session.CurrentPlayer.Balance - betAmount;
-        Session.UpdateBalance(newBalanceAfterBet); 
+        Session.UpdateBalance(newBalanceAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalanceAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, Session.CurrentPlayer.Balance);
 
-        // Genereaza rezultatul
         GenerateResult();
 
-        // Construieste array-ul plat pentru JS [r0c0, r0c1, r0c2, r1c0, r1c1, r1c2, r2c0, r2c1, r2c2]
-        var flat = new string[9];
-        for (int r = 0; r < 3; r++)
+        // Array plat pentru JS: [r0c0, r0c1, r0c2, r1c0, r1c1, r1c2, ... r4c0, r4c1, r4c2] = 15 elemente
+        var flat = new string[15];
+        for (int r = 0; r < 5; r++)
             for (int row = 0; row < 3; row++)
                 flat[r * 3 + row] = resultGrid[r, row];
 
         await InvokeAsync(StateHasChanged);
-
-        // Porneste animatia JS
         await JS.InvokeVoidAsync("slotsGame.spin", dotnetRef, flat);
     }
 
-    // ── Chemat din JS dupa ce toate reelurile s-au oprit ─────────────────
     [JSInvokable]
     public async Task OnSpinComplete()
     {
-        // Copiaza rezultatul in displayGrid
-        for (int r = 0; r < 3; r++)
+        for (int r = 0; r < 5; r++)
             for (int row = 0; row < 3; row++)
                 displayGrid[r, row] = resultGrid[r, row];
 
         CalculateWins();
         isSpinning = false;
-        // IMPORTANT: Marchează rolele ca oprite pentru a păstra clasa de CSS "reel-landed"
-        //reelStopped = new bool[] { true, true, true };
-        //spinKey = Guid.NewGuid();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -358,23 +359,35 @@ window.slotsGame = (function() {
     {
         var rng = new Random();
 
-        for (int r = 0; r < 3; r++)
+        for (int r = 0; r < 5; r++)
             for (int row = 0; row < 3; row++)
                 resultGrid[r, row] = PickSymbol(rng);
 
-        // Sansa de win controlata: ~40% probabilitate sa fortam o linie castigatoare
+        // ~30% șansă de a forța o linie câștigătoare
         double winRoll = rng.NextDouble();
-        if (winRoll < 0.40)
+        if (winRoll < 0.30)
         {
-            // Forteaza o linie castigatoare (aleatorie)
             int line = rng.Next(paylines.Length);
             string sym = PickSymbol(rng);
             for (int r = 0; r < 3; r++)
                 resultGrid[r, paylines[line][r]] = sym;
         }
+        if (winRoll < 0.20)
+        {
+            int line = rng.Next(paylines.Length);
+            string sym = PickSymbol(rng);
+            for (int r = 0; r < 4; r++)
+                resultGrid[r, paylines[line][r]] = sym;
+        }
+        if (winRoll < 0.10)
+        {
+            int line = rng.Next(paylines.Length);
+            string sym = PickSymbol(rng);
+            for (int r = 0; r < 5; r++)
+                resultGrid[r, paylines[line][r]] = sym;
+        }
     }
 
-    // ── Alege simbol ponderat ─────────────────────────────────────────────
     private string PickSymbol(Random rng)
     {
         int total = symbols.Sum(s => s.Weight);
@@ -391,7 +404,7 @@ window.slotsGame = (function() {
     // ── Calculeaza castiguri pe toate paylines ─────────────────────────────
     private void CalculateWins()
     {
-        winLines      = new();
+        winLines       = new();
         activePaylines = new();
         winCells       = new();
         totalWin       = 0;
@@ -399,20 +412,33 @@ window.slotsGame = (function() {
         for (int pi = 0; pi < paylines.Length; pi++)
         {
             var line = paylines[pi];
-            string s0 = resultGrid[0, line[0]];
-            string s1 = resultGrid[1, line[1]];
-            string s2 = resultGrid[2, line[2]];
+            string first = resultGrid[0, line[0]];
 
-            if (s0 == s1 && s1 == s2)
+            // Numără simbolurile identice consecutive de la rola 0 spre dreapta
+            int matchCount = 1;
+            for (int r = 1; r < 5; r++)
             {
-                var sym  = symbols.First(s => s.Emoji == s0);
-                double w = sym.Multiplier * betAmount;
+                if (resultGrid[r, line[r]] == first) matchCount++;
+                else break;
+            }
+
+            // Minim 3 pentru a plăti; se aplică doar cel mai bun nivel (5 > 4 > 3)
+            if (matchCount >= 3)
+            {
+                var sym = symbols.First(s => s.Emoji == first);
+                double mult = matchCount switch
+                {
+                    5 => sym.Mult5,
+                    4 => sym.Mult4,
+                    _ => sym.Mult3,   // 3 identice
+                };
+                double w = mult * betAmount;
                 totalWin += w;
                 activePaylines.Add(pi);
-                winLines.Add(new WinLine(paylineNames[pi], s0, w, pi));
+                winLines.Add(new WinLine(paylineNames[pi], first, w, pi, matchCount));
 
-                // Marcheaza celulele castigatoare (reel * 3 + row)
-                for (int r = 0; r < 3; r++)
+                // Evidențiază doar rolele care se potrivesc
+                for (int r = 0; r < matchCount; r++)
                     winCells.Add(r * 3 + line[r]);
             }
         }
@@ -461,13 +487,13 @@ window.slotsGame = (function() {
     .sl-bet-box     { text-align: center; }
     .sl-chips       { display: flex; gap: 8px; justify-content: center; }
     .sl-chip {
-        width: 48px; height: 48px;
+        width: 42px; height: 42px;
         border-radius: 50%;
         border: 2px solid rgba(255,255,255,0.1);
         background: #1a1a1a;
         color: #888;
         font-family: 'Bebas Neue', sans-serif;
-        font-size: 1rem;
+        font-size: 0.85rem;
         cursor: pointer;
         transition: all 0.2s;
     }
@@ -498,26 +524,16 @@ window.slotsGame = (function() {
         overflow: hidden;
     }
 
-    /* Linia principala de mijloc */
+    /* Linia principala de mijloc - eliminata */
     .sl-main-line-overlay {
-        position: absolute;
-        top: 50%;
-        left: 8px;
-        right: 8px;
-        height: 90px;
-        transform: translateY(-50%);
-        border-top: 1px solid rgba(196,30,58,0.3);
-        border-bottom: 1px solid rgba(196,30,58,0.3);
-        background: rgba(196,30,58,0.04);
-        pointer-events: none;
-        z-index: 1;
+        display: none;
     }
 
     /* ── COLOANA REEL ────────────────────────────────────────────────────── */
     .sl-reel-col {
         display: flex;
         flex-direction: column;
-        width: 100px;
+        width: 80px;
         transition: transform 0.1s;
         position: relative;
         z-index: 2;
@@ -533,18 +549,18 @@ window.slotsGame = (function() {
 
     /* ── CELULA ──────────────────────────────────────────────────────────── */
     .sl-cell {
-        width: 100px;
+        width: 80px;
         height: 90px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 2.4rem;
+        font-size: 2rem;
         border-radius: 8px;
         transition: background 0.3s;
         user-select: none;
     }
     .sl-cell-main {
-        font-size: 2.8rem;
+        font-size: 2rem;
     }
     .sl-cell-win {
         background: rgba(212,175,55,0.12) !important;
@@ -613,7 +629,7 @@ window.slotsGame = (function() {
         flex-direction: column;
         gap: 6px;
         width: 100%;
-        max-width: 480px;
+        max-width: 560px;
         animation: fadeUp 0.3s ease;
     }
     @@keyframes fadeUp { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
@@ -641,10 +657,9 @@ window.slotsGame = (function() {
         flex-wrap: wrap;
         justify-content: center;
     }
-    .sl-pay-row  { display: flex; flex-direction: column; align-items: center; gap: 2px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px 14px; min-width: 58px; }
-    .sl-pay-sym  { font-size: 1.6rem; }
-    .sl-pay-mult { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; color: #D4AF37; letter-spacing: 1px; }
-
+    .sl-pay-row  { display: flex; flex-direction: column; align-items: center; gap: 2px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px 14px; min-width: 72px; }
+    .sl-pay-sym  { font-size: 1.6rem; margin-bottom: 4px; }
+    .sl-pay-mult { font-family: 'Bebas Neue', sans-serif; font-size: 0.75rem; color: #D4AF37; letter-spacing: 1px; opacity: 1; }
     /* ── BUTON SPIN ──────────────────────────────────────────────────────── */
     .sl-spin-btn {
         padding: 16px 70px;
@@ -674,12 +689,11 @@ window.slotsGame = (function() {
 
     .sl-paylines-hint { font-size: 0.68rem; letter-spacing: 2px; color: #333; font-weight: 700; }
 
-    @@media (max-width: 560px) {
-        .sl-cell { width: 78px; height: 72px; font-size: 1.8rem; }
-        .sl-cell-main { font-size: 2.2rem; }
-        .sl-reel-col { width: 78px; }
+    @@media (max-width: 700px) {
+        .sl-cell { width: 58px; height: 72px; font-size: 1.5rem; }
+        .sl-cell-main { font-size: 1.5rem; }
+        .sl-reel-col { width: 58px; }
         .sl-reel-divider { height: 216px; }
         .sl-paylines-left, .sl-paylines-right { height: 216px; }
-        .sl-main-line-overlay { height: 72px; }
     }
 </style>

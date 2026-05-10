@@ -14,7 +14,7 @@
             @for (int i = 0; i < dealerHand.Count; i++)
             {
                 int ci = i;
-                bool hide = ci == 1 && gameState == GameState.Playing;
+                bool hide = ci == 1 && gameState == GameState.Playing && !isDealerPlaying;
                 <div class="bj-card @(GetColorClass(dealerHand[ci])) @(hide ? "card-back" : "")"
                      @key="@($"d{ci}r{roundKey}")"
                      style="--di:@ci">
@@ -35,7 +35,7 @@
         @if (dealerHand.Count > 0)
         {
             <div class="bj-score">
-                @if (gameState == GameState.Playing)
+                @if (gameState == GameState.Playing && !isDealerPlaying)
                 { @(GetHandValue(new List<Card>{ dealerHand[0] })) <span style="color:#555">+ ?</span> }
                 else
                 { @GetHandValue(dealerHand) }
@@ -43,10 +43,8 @@
         }
     </div>
 
-    @* ── LINIE MASA ──────────────────────────────────────────────────────── *@
-    <div class="bj-table-line">
-        <span class="bj-table-text">BLACKJACK PAYS 3:2 &nbsp;·&nbsp; DEALER MUST DRAW TO 16 &nbsp;·&nbsp; STAND ON 17</span>
-    </div>
+    @* ── LINIE DESPARTIRE ────────────────────────────────────────────────── *@
+    <div class="bj-divider"></div>
 
     @* ── BANNER REZULTAT ─────────────────────────────────────────────────── *@
     @if (gameState == GameState.Result)
@@ -84,45 +82,85 @@
             </div>
         }
 
-        @* Stiva jetoane + butoane actiune *@
-        <div class="bj-bet-area">
-            <div class="bj-chip-stack">
-                @if (currentBet == 0)
-                {
-                    <div class="bet-empty">Plasează pariul</div>
-                }
-                else
-                {
-                    @foreach (var v in GetChipStack(currentBet))
-                    {
-                        <div class="stacked-chip chip-@v">@v</div>
-                    }
-                    <div class="bet-total">@currentBet RON</div>
-                }
-            </div>
-
-            @if (gameState == GameState.Playing)
-            {
-                <div class="bj-actions">
-                    <button class="bj-btn hit"    @onclick="Hit">HIT</button>
-                    <button class="bj-btn stand"  @onclick="Stand">STAND</button>
-                    <button class="bj-btn dbl @(!CanDouble() ? "off" : "")"
-                            @onclick="DoubleDown" disabled="@(!CanDouble())">2×</button>
-                </div>
-            }
-        </div>
     </div>
 
-    @* ── PANEL PARIURI ───────────────────────────────────────────────────── *@
+    @* ── SIDEBAR DREAPTA: balanta + butoane — mereu vizibile ────────────── *@
+    <div class="bj-sidebar">
+
+        @* Balanta *@
+        <div class="bj-bal">
+            <span class="bj-bal-lbl">BALANTA</span>
+            <span class="bj-bal-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
+        </div>
+
+        @* Butoane HIT/STAND/2x — vizibile doar in joc *@
+        @if (gameState == GameState.Playing)
+        {
+            <div class="bj-sidebar-actions">
+                <button class="bj-btn hit"   @onclick="Hit"   disabled="@isDealerPlaying">HIT</button>
+                <button class="bj-btn stand" @onclick="Stand" disabled="@isDealerPlaying">STAND</button>
+                <button class="bj-btn dbl @(!CanDouble() ? "off" : "")"
+                        @onclick="DoubleDown" disabled="@(!CanDouble())">2×</button>
+            </div>
+        }
+
+        @* Butoane STERGE/REBET/DEAL — vizibile la bet/result *@
+        @if (gameState == GameState.Betting || gameState == GameState.Result)
+        {
+            <div class="bj-sidebar-actions">
+                <button class="bj-ctrl clear" @onclick="ClearBet" disabled="@(currentBet == 0 || isResetting)">✕ STERGE</button>
+                <button class="bj-ctrl rebet" @onclick="Rebet"
+                        disabled="@(lastBet == 0 || Session.CurrentPlayer!.Balance < lastBet || isResetting)">
+                    ↺ REBET (@lastBet RON)
+                </button>
+                <button class="bj-deal @(currentBet == 0 || isResetting ? "deal-off" : "")"
+                        @onclick="Deal" disabled="@(currentBet == 0 || isResetting)">
+                    DEAL
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(errorMsg))
+            {
+                <div class="bj-error">@errorMsg</div>
+            }
+        }
+
+    </div>
+
+    @* ── PANEL PARIURI — doar chips ──────────────────────────────────────── *@
     @if (gameState == GameState.Betting || gameState == GameState.Result)
     {
         <div class="bj-bet-panel">
 
+            @* Stiva jetoane plasate *@
+            <div class="bj-chip-stack-wrap">
+                @if (currentBet > 0 && !isResetting)
+                {
+                    var columns = GetChipColumns(currentBet);
+                    <div class="bj-chip-cols">
+                        @foreach (var col in columns)
+                        {
+                            <div class="bj-chip-col">
+                                @foreach (var v in col)
+                                {
+                                    <div class="stacked-chip chip-@v">@v</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="bet-total">@currentBet RON</div>
+                }
+                else
+                {
+                    <div class="bet-empty">Plaseaza pariul</div>
+                }
+            </div>
+
+            @* Rand jetoane de selectat *@
             <div class="bj-chips-row">
                 @foreach (var cv in chipDenoms)
                 {
                     int c = cv;
-                    bool ok = Session.CurrentPlayer!.Balance >= c;
+                    bool ok = !isResetting && Session.CurrentPlayer!.Balance >= c;
                     <button class="bj-chip chip-@c @(!ok ? "chip-off" : "")"
                             @onclick="() => AddChip(c)" disabled="@(!ok)">
                         <span class="chi">@c</span>
@@ -131,42 +169,8 @@
                 }
             </div>
 
-            <div class="bj-bet-controls">
-                <button class="bj-ctrl clear" @onclick="ClearBet" disabled="@(currentBet == 0)">✕ STERGE</button>
-                <button class="bj-ctrl rebet" @onclick="Rebet"
-                        disabled="@(lastBet == 0 || Session.CurrentPlayer!.Balance < lastBet)">
-                    ↺ REBET (@lastBet RON)
-                </button>
-                <button class="bj-deal @(currentBet == 0 ? "deal-off" : "")"
-                        @onclick="Deal" disabled="@(currentBet == 0)">
-                    DEAL
-                </button>
-            </div>
-
-            @if (!string.IsNullOrEmpty(errorMsg))
-            {
-                <div class="bj-error">@errorMsg</div>
-            }
-
         </div>
     }
-
-    @* ── BALANTA + TABLA PLATI ───────────────────────────────────────────── *@
-    <div class="bj-bottom">
-        <div class="bj-paytable">
-            @foreach (var s in chipDenoms)
-            { }
-            <span class="pt-item">BJ → 3:2</span>
-            <span class="pt-sep">·</span>
-            <span class="pt-item">WIN → 1:1</span>
-            <span class="pt-sep">·</span>
-            <span class="pt-item">PUSH → bet back</span>
-        </div>
-        <div class="bj-bal">
-            <span class="bj-bal-lbl">BALANȚĂ</span>
-            <span class="bj-bal-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
-        </div>
-    </div>
 
 </div>
 
@@ -189,9 +193,11 @@
     private int    lastBet    = 0;
 
     // ── Rezultat ──────────────────────────────────────────────────────────
-    private string errorMsg   = "";
-    private string resultMsg  = "";
-    private double resultWin  = 0;
+    private string errorMsg    = "";
+    private string resultMsg   = "";
+    private double resultWin   = 0;
+    private bool   isResetting    = false;
+    private bool   isDealerPlaying = false;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
@@ -212,19 +218,21 @@
     // ── Jetoane ───────────────────────────────────────────────────────────
     private void AddChip(int v)
     {
+        if (isResetting) return;
         if (Session.CurrentPlayer!.Balance < currentBet + v)
         {
-            errorMsg = "Balanță insuficientă!";
+            errorMsg = "Balanta insuficienta!";
             return;
         }
         errorMsg = "";
         currentBet += v;
     }
 
-    private void ClearBet() { currentBet = 0; errorMsg = ""; }
+    private void ClearBet() { if (isResetting) return; currentBet = 0; errorMsg = ""; }
 
     private void Rebet()
     {
+        if (isResetting) return;
         if (Session.CurrentPlayer!.Balance < lastBet) return;
         currentBet = lastBet;
         errorMsg   = "";
@@ -233,9 +241,9 @@
     // ── DEAL ──────────────────────────────────────────────────────────────
     private void Deal()
     {
+        if (isResetting) return;
         if (currentBet == 0 || Session.CurrentPlayer!.Balance < currentBet) return;
 
-        // Scade pariul
         var balAfterBet = Session.CurrentPlayer.Balance - currentBet;
         Session.UpdateBalance(balAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
@@ -256,22 +264,22 @@
     // ── HIT ───────────────────────────────────────────────────────────────
     private void Hit()
     {
+        if (isDealerPlaying) return;
         playerHand.Add(Draw());
         if (GetHandValue(playerHand) >= 21) EndGame();
     }
 
     // ── STAND ─────────────────────────────────────────────────────────────
-    private void Stand() => DealerPlay();
+    private async Task Stand() => await DealerPlay();
 
     // ── DOUBLE DOWN ───────────────────────────────────────────────────────
     private bool CanDouble() =>
-        playerHand.Count == 2 && Session.CurrentPlayer!.Balance >= currentBet;
+        !isDealerPlaying && playerHand.Count == 2 && Session.CurrentPlayer!.Balance >= currentBet;
 
-    private void DoubleDown()
+    private async Task DoubleDown()
     {
         if (!CanDouble()) return;
 
-        // Scade inca un pariu
         var balAfterDouble = Session.CurrentPlayer!.Balance - currentBet;
         Session.UpdateBalance(balAfterDouble);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterDouble);
@@ -280,14 +288,55 @@
         playerHand.Add(Draw());
 
         if (GetHandValue(playerHand) > 21) EndGame();
-        else DealerPlay();
+        else await DealerPlay();
     }
 
-    // ── DEALER JOACA ─────────────────────────────────────────────────────
-    private void DealerPlay()
+    // ── DEALER JOACA ──────────────────────────────────────────────────────
+    private async Task DealerPlay()
     {
+        isDealerPlaying = true;
+        await InvokeAsync(StateHasChanged);
+
+        bool playerBJ = GetHandValue(playerHand) == 21 && playerHand.Count == 2;
+        int pv = GetHandValue(playerHand);
+
+        if (playerBJ)
+        {
+            // Daca jucatorul are BJ: dezvaluie imediat si incepe sa traga
+            await InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            // Altfel: asteapta 1 secunda inainte de a dezvalui
+            await Task.Delay(1000);
+            await InvokeAsync(StateHasChanged);
+
+            // Daca dupa dezvaluire dealer-ul bate deja jucatorul, end imediat
+            if (GetHandValue(dealerHand) > pv || GetHandValue(dealerHand) >= 17)
+            {
+                isDealerPlaying = false;
+                EndGame();
+                return;
+            }
+        }
+
+        // Trage carti una cate una la fiecare 1 secunda
         while (GetHandValue(dealerHand) < 17)
+        {
+            await Task.Delay(1000);
             dealerHand.Add(Draw());
+            await InvokeAsync(StateHasChanged);
+
+            // Daca dealer-ul bate jucatorul sau a facut bust, end imediat
+            if (GetHandValue(dealerHand) > pv || GetHandValue(dealerHand) > 21)
+            {
+                isDealerPlaying = false;
+                EndGame();
+                return;
+            }
+        }
+
+        isDealerPlaying = false;
         EndGame();
     }
 
@@ -305,20 +354,18 @@
 
         if (pv > 21)
         {
-            // Bust — banii deja scazuti la deal
-            resultMsg = "BUST — AI PIERDUT";
-            resultWin = -currentBet;
-            newBalance = currentBalance; // nu mai schimbam nimic
+            resultMsg  = "BUST — AI PIERDUT";
+            resultWin  = -currentBet;
+            newBalance = currentBalance;
         }
         else if (dealerBJ && !playerBJ)
         {
-            resultMsg = "DEALER BLACKJACK";
-            resultWin = -currentBet;
+            resultMsg  = "DEALER BLACKJACK";
+            resultWin  = -currentBet;
             newBalance = currentBalance;
         }
         else if (playerBJ && !dealerBJ)
         {
-            // BJ plateste 3:2 → primesti inapoi pariul + 1.5x
             double winAmt = currentBet * 1.5;
             resultMsg  = "✦ BLACKJACK! ✦";
             resultWin  = winAmt;
@@ -328,7 +375,7 @@
         }
         else if (dv > 21)
         {
-            resultMsg  = "DEALER BUST — AI CÂȘTIGAT!";
+            resultMsg  = "DEALER BUST — AI CASTIGAT!";
             resultWin  = currentBet;
             newBalance = currentBalance + currentBet * 2;
             Session.UpdateBalance(newBalance);
@@ -336,7 +383,7 @@
         }
         else if (pv > dv)
         {
-            resultMsg  = "AI CÂȘTIGAT!";
+            resultMsg  = "AI CASTIGAT!";
             resultWin  = currentBet;
             newBalance = currentBalance + currentBet * 2;
             Session.UpdateBalance(newBalance);
@@ -344,7 +391,6 @@
         }
         else if (pv == dv)
         {
-            // Push — returneaza pariul
             resultMsg  = "EGALITATE — PUSH";
             resultWin  = 0;
             newBalance = currentBalance + currentBet;
@@ -353,16 +399,34 @@
         }
         else
         {
-            resultMsg  = "DEALER CÂȘTIGĂ";
+            resultMsg  = "DEALER CASTIGA";
             resultWin  = -currentBet;
             newBalance = currentBalance;
         }
 
-        lastBet   = currentBet;
-        gameState = GameState.Result;
+        lastBet    = currentBet;
+        currentBet = 0;
+        gameState  = GameState.Result;
+        isResetting = true;
+
+        // Reseteaza masa dupa 2 secunde
+        _ = ResetAfterDelayAsync();
     }
 
-    // ── DECK ─────────────────────────────────────────────────────────────
+    private async Task ResetAfterDelayAsync()
+    {
+        await Task.Delay(2000);
+        playerHand  = new();
+        dealerHand  = new();
+        resultMsg   = "";
+        errorMsg    = "";
+        isResetting = false;
+        gameState   = GameState.Betting;
+        currentBet  = 0;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // ── DECK ──────────────────────────────────────────────────────────────
     private void BuildDeck()
     {
         deck = new();
@@ -408,17 +472,35 @@
     private string GetResultClass() => resultMsg switch
     {
         var m when m.Contains("BLACKJACK") && m.Contains("✦") => "res-bj",
-        var m when m.Contains("CÂȘTIGAT")  => "res-win",
+        var m when m.Contains("CASTIGAT")  => "res-win",
         var m when m.Contains("EGALITATE") => "res-push",
         _                                  => "res-lose"
     };
 
-    private List<int> GetChipStack(int amount)
+    // Multi-column chip stack: each column holds chips of one denomination,
+    // ordered 100→50→25→10→5→1, max 10 chips per column, max 10 columns shown
+    private List<List<int>> GetChipColumns(int amount)
     {
-        var result = new List<int>();
-        foreach (var d in new[] { 100,50,25,10,5,1 })
-            while (amount >= d && result.Count < 8) { result.Add(d); amount -= d; }
-        return result;
+        var columns = new List<List<int>>();
+        int remaining = amount;
+
+        foreach (var d in new[] { 100, 50, 25, 10, 5, 1 })
+        {
+            if (remaining <= 0 || columns.Count >= 10) break;
+            int count = remaining / d;
+            if (count == 0) continue;
+            remaining -= count * d;
+
+            // Split into sub-columns of 10 if needed
+            while (count > 0 && columns.Count < 10)
+            {
+                int take = Math.Min(count, 10);
+                columns.Add(Enumerable.Repeat(d, take).ToList());
+                count -= take;
+            }
+        }
+
+        return columns;
     }
 }
 
@@ -444,8 +526,16 @@
     .dealer-zone { padding-bottom: 12px; }
     .player-zone { padding-top: 12px; }
     .bj-zone-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.8rem; letter-spacing: 4px; color: rgba(212,175,55,0.4); }
-    .bj-table-line { width: 80%; max-width: 560px; border-top: 1px solid rgba(212,175,55,0.2); border-bottom: 1px solid rgba(212,175,55,0.2); padding: 7px 0; text-align: center; margin: 8px 0; }
-    .bj-table-text { font-size: 0.62rem; letter-spacing: 2px; color: rgba(212,175,55,0.35); font-weight: 700; }
+
+    /* ── LINIE DESPARTIRE ────────────────────────────────────────────────── */
+    .bj-divider {
+        width: 70%;
+        height: 3px;
+        background: linear-gradient(to right, transparent, #D4AF37 20%, #D4AF37 80%, transparent);
+        border-radius: 2px;
+        box-shadow: 0 0 10px rgba(212,175,55,0.5);
+        margin: 6px 0;
+    }
 
     /* ── MAINI ───────────────────────────────────────────────────────────── */
     .bj-hand { display: flex; justify-content: center; min-height: 120px; align-items: center; }
@@ -458,22 +548,21 @@
         margin-left: -14px; flex-shrink: 0;
         display: flex; align-items: center; justify-content: center;
         border: 1px solid rgba(0,0,0,0.1);
-        animation: cardIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
-        animation-delay: calc(var(--di, 0) * 120ms);
+        animation: cardIn 0.6s cubic-bezier(0.22,1,0.36,1) both;
     }
     .bj-card:first-child { margin-left: 0; }
     @@keyframes cardIn {
-        from { transform: translateY(-60px) rotate(-8deg) scale(0.85); opacity: 0; }
-        to   { transform: translateY(0) rotate(0) scale(1); opacity: 1; }
+        from { transform: translateY(-40px) scale(0.9); opacity: 0; }
+        to   { transform: translateY(0) scale(1); opacity: 1; }
     }
-    .cr   { position: absolute; top: 5px; left: 7px; font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 900; line-height: 1; }
-    .cs-tl{ position: absolute; top: 20px; left: 7px; font-size: 0.75rem; line-height: 1; }
-    .cs-c { font-size: 2rem; line-height: 1; }
-    .cs-br{ position: absolute; bottom: 7px; right: 7px; font-size: 0.75rem; transform: rotate(180deg); line-height: 1; }
-    .card-red   { color: #c0392b; }
-    .card-black { color: #1a1a1a; }
-    .card-back  { background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 50%, #1a0a2e 100%); }
-    .cbp { font-size: 0.55rem; letter-spacing: 1px; color: rgba(212,175,55,0.3); writing-mode: vertical-rl; user-select: none; }
+    .bj-table .cr   { position: absolute; top: 5px; left: 7px; font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 900; line-height: 1; }
+    .bj-table .cs-tl{ position: absolute; top: 20px; left: 7px; font-size: 0.75rem; line-height: 1; }
+    .bj-table .cs-c { font-size: 2rem; line-height: 1; }
+    .bj-table .cs-br{ position: absolute; bottom: 7px; right: 7px; font-size: 0.75rem; transform: rotate(180deg); line-height: 1; }
+    .bj-table .card-red   { color: #c0392b; }
+    .bj-table .card-black { color: #1a1a1a; }
+    .bj-table .card-back  { background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 50%, #1a0a2e 100%) !important; color: transparent !important; }
+    .bj-table .cbp { font-size: 0.55rem; letter-spacing: 1px; color: rgba(212,175,55,0.3); writing-mode: vertical-rl; user-select: none; }
 
     /* ── SCOR ────────────────────────────────────────────────────────────── */
     .bj-score { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 2px; padding: 4px 14px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 99px; color: #f0e6d3; }
@@ -489,13 +578,78 @@
     .res-push { background: rgba(255,255,255,0.06);border: 1px solid rgba(255,255,255,0.15);color: #888; }
     .res-lose { background: rgba(196,30,58,0.12);  border: 1px solid rgba(196,30,58,0.35); color: #e74c3c; }
 
-    /* ── ZONA PARIU ──────────────────────────────────────────────────────── */
-    .bj-bet-area { display: flex; align-items: center; gap: 24px; margin-top: 8px; }
-    .bj-chip-stack { display: flex; flex-direction: column-reverse; align-items: center; min-width: 70px; min-height: 50px; justify-content: flex-end; }
-    .bet-empty { font-size: 0.72rem; letter-spacing: 1.5px; color: rgba(212,175,55,0.2); white-space: nowrap; border: 1px dashed rgba(212,175,55,0.15); padding: 6px 12px; border-radius: 6px; }
+    /* ── SIDEBAR DREAPTA ─────────────────────────────────────────────────── */
+    .bj-sidebar {
+        position: absolute;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 16px;
+        z-index: 10;
+    }
+    .bj-bal { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+    .bj-bal-lbl { font-size: 0.6rem; letter-spacing: 3px; color: #444; font-weight: 700; }
+    .bj-bal-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: #D4AF37; letter-spacing: 2px; }
+    .bj-sidebar-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+    .bj-error { color: #e74c3c; font-size: 0.75rem; text-align: right; }
+
+    /* Butoane HIT/STAND/2x + STERGE/REBET/DEAL — toate aceeasi latime */
+    .bj-btn, .bj-ctrl, .bj-deal {
+        width: 120px; height: 44px;
+        border-radius: 6px;
+        font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 2px;
+        cursor: pointer; transition: all 0.15s;
+        display: flex; align-items: center; justify-content: center; text-align: center;
+        border: none;
+    }
+    .bj-btn.hit   { background: linear-gradient(135deg,#27ae60,#1e8449); color: white; box-shadow: 0 4px 12px rgba(39,174,96,0.4); }
+    .bj-btn.hit:hover { background: linear-gradient(135deg,#2ecc71,#27ae60); transform: translateY(-2px); }
+    .bj-btn.stand { background: linear-gradient(135deg,#c0392b,#922b21); color: white; box-shadow: 0 4px 12px rgba(192,57,43,0.4); }
+    .bj-btn.stand:hover { background: linear-gradient(135deg,#e74c3c,#c0392b); transform: translateY(-2px); }
+    .bj-btn.dbl   { background: linear-gradient(135deg,#d35400,#a04000); color: white; box-shadow: 0 4px 12px rgba(211,84,0,0.4); }
+    .bj-btn.dbl:hover:not(.off) { background: linear-gradient(135deg,#e67e22,#d35400); transform: translateY(-2px); }
+    .bj-btn.dbl.off { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .bj-ctrl {
+        background: transparent; border: 1px solid rgba(255,255,255,0.12);
+        font-family: 'Rajdhani', sans-serif; font-size: 0.78rem; font-weight: 700; letter-spacing: 1.2px; color: #666;
+    }
+    .bj-ctrl:hover:not(:disabled) { border-color: rgba(255,255,255,0.3); color: #f0e6d3; background: rgba(255,255,255,0.05); }
+    .bj-ctrl:disabled { opacity: 0.3; cursor: not-allowed; }
+    .bj-ctrl.clear:hover:not(:disabled) { border-color: rgba(231,76,60,0.5); color: #e74c3c; }
+    .bj-ctrl.rebet:hover:not(:disabled) { border-color: rgba(212,175,55,0.5); color: #D4AF37; }
+    .bj-deal {
+        background: linear-gradient(135deg,#D4AF37 0%,#b8960c 100%); color: #080808;
+        font-size: 1.3rem; letter-spacing: 4px;
+        box-shadow: 0 6px 20px rgba(212,175,55,0.4), 0 2px 0 #8a6900;
+        height: 48px;
+    }
+    .bj-deal:hover:not(.deal-off) { background: linear-gradient(135deg,#e8c84a 0%,#D4AF37 100%); transform: translateY(-2px); }
+    .bj-deal.deal-off { opacity: 0.3; cursor: not-allowed; transform: none; background: #333; box-shadow: none; }
+
+    /* ── PANEL PARIURI ───────────────────────────────────────────────────── */
+    /* 10 coloane × 52px + 9 gap-uri × 4px + padding 40px = ~596px */
+    .bj-bet-panel {
+        display: flex; flex-direction: column; align-items: center; gap: 14px;
+        width: 100%; max-width: 620px;
+        padding: 18px 20px;
+        background: rgba(0,0,0,0.25); border: 1px solid rgba(212,175,55,0.1);
+        border-radius: 10px; margin-top: 8px;
+    }
+
+    /* Stiva jetoane — inalta cat 10 chips stivuite */
+    .bj-chip-stack-wrap {
+        display: flex; flex-direction: column; align-items: center; gap: 4px;
+        min-height: 220px; width: 100%; justify-content: flex-end;
+    }
+    .bj-chip-cols { display: flex; flex-direction: row; align-items: flex-end; justify-content: center; gap: 4px; width: 100%; }
+    .bj-chip-col  { display: flex; flex-direction: column-reverse; align-items: center; }
+    .bet-empty { font-size: 0.7rem; letter-spacing: 1.5px; color: rgba(212,175,55,0.2); white-space: nowrap; border: 1px dashed rgba(212,175,55,0.15); padding: 6px 12px; border-radius: 6px; }
     .stacked-chip { width: 52px; height: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 0.65rem; letter-spacing: 1px; margin-top: -4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); animation: chipIn 0.15s ease; }
     @@keyframes chipIn { from { transform: translateY(-10px) scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
-    .bet-total { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; color: #D4AF37; margin-top: 4px; letter-spacing: 1px; }
+    .bet-total { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; color: #D4AF37; margin-top: 6px; letter-spacing: 1px; }
 
     /* Culori jetoane stivuite */
     .chip-1   { background: linear-gradient(180deg,#aaa,#888); color:#fff; border:1px solid #666; }
@@ -505,22 +659,8 @@
     .chip-50  { background: linear-gradient(180deg,#e67e22,#d35400); color:#fff; border:1px solid #a04000; }
     .chip-100 { background: linear-gradient(180deg,#8e44ad,#6c3483); color:#fff; border:1px solid #4a235a; }
 
-    /* Butoane HIT / STAND / 2x */
-    .bj-actions { display: flex; flex-direction: column; gap: 8px; }
-    .bj-btn { padding: 10px 22px; border: none; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 3px; cursor: pointer; transition: all 0.15s; min-width: 90px; }
-    .bj-btn.hit   { background: linear-gradient(135deg,#27ae60,#1e8449); color: white; box-shadow: 0 4px 12px rgba(39,174,96,0.4); }
-    .bj-btn.hit:hover { background: linear-gradient(135deg,#2ecc71,#27ae60); transform: translateY(-2px); }
-    .bj-btn.stand { background: linear-gradient(135deg,#c0392b,#922b21); color: white; box-shadow: 0 4px 12px rgba(192,57,43,0.4); }
-    .bj-btn.stand:hover { background: linear-gradient(135deg,#e74c3c,#c0392b); transform: translateY(-2px); }
-    .bj-btn.dbl   { background: linear-gradient(135deg,#d35400,#a04000); color: white; box-shadow: 0 4px 12px rgba(211,84,0,0.4); font-size: 1rem; }
-    .bj-btn.dbl:hover:not(.off) { background: linear-gradient(135deg,#e67e22,#d35400); transform: translateY(-2px); }
-    .bj-btn.dbl.off { opacity: 0.35; cursor: not-allowed; transform: none; }
-
-    /* ── PANEL PARIURI ───────────────────────────────────────────────────── */
-    .bj-bet-panel { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; max-width: 560px; padding: 18px 20px; background: rgba(0,0,0,0.25); border: 1px solid rgba(212,175,55,0.1); border-radius: 10px; margin-top: 8px; }
+    /* Rand jetoane de selectat */
     .bj-chips-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-
-    /* Jetoane mari de selectat */
     .bj-chip {
         width: 58px; height: 58px; border-radius: 50%; border: none; cursor: pointer;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -528,13 +668,11 @@
         box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
     }
     .bj-chip::before { content:''; position:absolute; inset:4px; border-radius:50%; border:2px dashed rgba(255,255,255,0.25); }
-    .bj-chip:hover:not(.chip-off) { transform: translateY(-4px) scale(1.08); box-shadow: 0 8px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2); }
+    .bj-chip:hover:not(.chip-off) { transform: translateY(-4px) scale(1.08); }
     .bj-chip:active:not(.chip-off) { transform: scale(0.97); }
     .bj-chip.chip-off { opacity: 0.3; cursor: not-allowed; }
-    .chi    { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 1px; color: white; line-height: 1; }
-    .chcur  { font-size: 0.55rem; letter-spacing: 1px; color: rgba(255,255,255,0.7); line-height: 1; }
-
-    /* Aceleasi culori pentru jetoanele mari */
+    .chi   { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 1px; color: white; line-height: 1; }
+    .chcur { font-size: 0.55rem; letter-spacing: 1px; color: rgba(255,255,255,0.7); line-height: 1; }
     .bj-chip.chip-1   { background: linear-gradient(160deg,#bbb,#888); }
     .bj-chip.chip-5   { background: linear-gradient(160deg,#e74c3c,#c0392b); }
     .bj-chip.chip-10  { background: linear-gradient(160deg,#3498db,#2980b9); }
@@ -542,34 +680,12 @@
     .bj-chip.chip-50  { background: linear-gradient(160deg,#e67e22,#d35400); }
     .bj-chip.chip-100 { background: linear-gradient(160deg,#9b59b6,#6c3483); }
 
-    /* Controale bet */
-    .bj-bet-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
-    .bj-ctrl { padding: 8px 18px; background: transparent; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; font-family: 'Rajdhani', sans-serif; font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px; color: #666; cursor: pointer; transition: all 0.2s; }
-    .bj-ctrl:hover:not(:disabled) { border-color: rgba(255,255,255,0.3); color: #f0e6d3; background: rgba(255,255,255,0.05); }
-    .bj-ctrl:disabled { opacity: 0.3; cursor: not-allowed; }
-    .bj-ctrl.clear:hover:not(:disabled) { border-color: rgba(231,76,60,0.5); color: #e74c3c; }
-    .bj-ctrl.rebet:hover:not(:disabled) { border-color: rgba(212,175,55,0.5); color: #D4AF37; }
-
-    /* Buton DEAL */
-    .bj-deal { padding: 12px 44px; background: linear-gradient(135deg,#D4AF37 0%,#b8960c 100%); color: #080808; border: none; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 4px; cursor: pointer; transition: all 0.2s; box-shadow: 0 6px 20px rgba(212,175,55,0.4), 0 2px 0 #8a6900; }
-    .bj-deal:hover:not(.deal-off) { background: linear-gradient(135deg,#e8c84a 0%,#D4AF37 100%); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(212,175,55,0.6), 0 2px 0 #8a6900; }
-    .bj-deal.deal-off { opacity: 0.3; cursor: not-allowed; transform: none; background: #333; box-shadow: none; }
-
-    .bj-error { color: #e74c3c; font-size: 0.8rem; letter-spacing: 0.5px; }
-
-    /* ── BOTTOM ───────────────────────────────────────────────────────────── */
-    .bj-bottom { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 14px; }
-    .bj-paytable { display: flex; gap: 8px; align-items: center; }
-    .pt-item { font-size: 0.65rem; letter-spacing: 1.5px; color: rgba(212,175,55,0.3); font-weight: 700; }
-    .pt-sep  { color: rgba(212,175,55,0.15); }
-    .bj-bal  { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-    .bj-bal-lbl { font-size: 0.62rem; letter-spacing: 3px; color: #444; font-weight: 700; }
-    .bj-bal-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: #D4AF37; letter-spacing: 2px; }
-
-    @@media (max-width: 520px) {
+    @@media (max-width: 600px) {
         .bj-card { width: 58px; height: 86px; }
         .cs-c { font-size: 1.5rem; }
-        .bj-chip { width: 48px; height: 48px; }
+        .bj-chip { width: 46px; height: 46px; }
         .chi { font-size: 1rem; }
+        .bj-sidebar { position: static; transform: none; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; width: 100%; right: unset; top: unset; }
+        .bj-btn, .bj-ctrl, .bj-deal { width: 90px; }
     }
 </style>
