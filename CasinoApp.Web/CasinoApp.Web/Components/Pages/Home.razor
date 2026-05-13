@@ -144,7 +144,7 @@
             <a class="sb-item @(activeGame=="blackjack"?"active":"")"  @onclick='()=>TrySetGame("blackjack")'><span>🃏</span> BlackJack</a>
             <a class="sb-item @(activeGame=="slots"?"active":"")"      @onclick='()=>TrySetGame("slots")'><span>🎰</span> Slots</a>
             <a class="sb-item @(activeGame=="craps"?"active":"")"      @onclick='()=>TrySetGame("craps")'><span>🎲</span> Craps <small class="ro-tag">Barbut</small></a>
-            <a class="sb-item @(activeGame=="poker"?"active":"")"      @onclick='()=>TrySetGame("poker")'><span>♠️</span> Poker</a>
+            <a class="sb-item @(activeGame=="mines"?"active":"")" @onclick='()=>TrySetGame("mines")'><span>💣</span> Mines</a>
             <a class="sb-item @(activeGame=="flipacoin"?"active":"")"  @onclick='()=>TrySetGame("flipacoin")'><span>🪙</span> Flip a Coin</a>
             <a class="sb-item @(activeGame=="wheel"?"active":"")"      @onclick='()=>TrySetGame("wheel")'><span>🎯</span> Roata Norocului</a>
             <a class="sb-item @(activeGame=="scratch"?"active":"")"    @onclick='()=>TrySetGame("scratch")'><span>🎟️</span> Scratch Cards</a>
@@ -171,8 +171,7 @@
                 <div class="game-card @(activeGame=="slots"?"selected":"")"         @onclick='()=>TrySetGame("slots")'><div class="gi sl">🎰</div><div class="gn">Slots</div><div class="gd">Jackpot-uri uriașe te așteaptă</div><span class="gb new">NOU</span></div>
                 <div class="game-card @(activeGame=="craps"?"selected":"")"         @onclick='()=>TrySetGame("craps")'><div class="gi cr">🎲</div><div class="gn">Craps</div><div class="gd">Barbut — zaruri și adrenalină</div></div>
                 <div class="game-card @(activeGame=="roulette-red"?"selected":"")"  @onclick='()=>TrySetGame("roulette-red")'><div class="gi ro">🎡</div><div class="gn">Ruletă</div><div class="gd">Roșu, negru sau verde</div><span class="gb live">LIVE</span></div>
-                <div class="game-card @(activeGame=="poker"?"selected":"")"         @onclick='()=>TrySetGame("poker")'><div class="gi pk">♠️</div><div class="gn">Poker</div><div class="gd">Texas Hold'em clasic</div><span class="gb hot">HOT</span></div>
-                <div class="game-card @(activeGame=="flipacoin"?"selected":"")"     @onclick='()=>TrySetGame("flipacoin")'><div class="gi ba">🪙</div><div class="gn">Flip a Coin</div><div class="gd">Cap sau pajura — 50/50</div><span class="gb new">NOU</span></div>
+                <div class="game-card @(activeGame=="mines"?"selected":"")"         @onclick='()=>TrySetGame("mines")'><div class="gi mn">💣</div><div class="gn">Mines</div><div class="gd">Găsește diamantele, evită minele</div><span class="gb hot">HOT</span></div>                <div class="game-card @(activeGame=="flipacoin"?"selected":"")"     @onclick='()=>TrySetGame("flipacoin")'><div class="gi ba">🪙</div><div class="gn">Flip a Coin</div><div class="gd">Cap sau pajura — 50/50</div><span class="gb new">NOU</span></div>
                 <div class="game-card @(activeGame=="wheel"?"selected":"")"         @onclick='()=>TrySetGame("wheel")'><div class="gi wh">🎯</div><div class="gn">Roata Norocului</div><div class="gd">Învârte și câștigă</div><span class="gb new">NOU</span></div>
                 <div class="game-card @(activeGame=="scratch"?"selected":"")"       @onclick='()=>TrySetGame("scratch")'><div class="gi sc">🎟️</div><div class="gn">Scratch Cards</div><div class="gd">Zgârie și descoperă premiul</div></div>
             </div>
@@ -207,12 +206,12 @@
                 }else if(activeGame == "flipacoin")
                 {
                     <FlipACoin/>
-                }else
-                    {
-                    <div class="ga-placeholder">
-                        🚧 <strong>@GetGameTitle(activeGame)</strong> se construiește...<br/>
-                        <span>Logica jocului va fi adăugată aici</span>
-                    </div>
+                }else if(activeGame == "wheel")
+                {
+                    <WheelOfFortune/>
+                }else if(activeGame == "mines")
+                {
+                    <Mines/>
                 }
             </div>
             }
@@ -327,7 +326,7 @@ public void Dispose()
     private string GetGameTitle(string g) => g switch
     {
         "blackjack"      => "BlackJack",      "slots"          => "Slots",
-        "craps"          => "Craps (Barbut)", "poker"          => "Poker",
+        "craps"          => "Craps (Barbut)", "mines"          => "Mines",
         "flipacoin"      => "Flip a Coin",    "wheel"          => "Roata Norocului",
         "scratch"        => "Scratch Cards",  "roulette-red"   => "Ruletă — Red",
         "roulette-black" => "Ruletă — Black", "roulette-green" => "Ruletă — Green",

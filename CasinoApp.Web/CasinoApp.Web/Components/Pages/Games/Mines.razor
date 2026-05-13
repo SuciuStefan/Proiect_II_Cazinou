@@ -1,0 +1,803 @@
+@using CasinoApp.DataAccess.DB_operations
+@inject CasinoApp.Web.Services.SessionService Session
+@inject PlayerRepository PlayerRepo
+@implements IDisposable
+
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
+
+<div class="mn-table">
+
+    @* ══ SIDEBAR STANGA ══════════════════════════════════════════════════════ *@
+    <div class="mn-sidebar">
+
+        @* Balanta *@
+        <div class="mn-bal-box">
+            <span class="mn-lbl">BALANTĂ</span>
+            <span class="mn-bal-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
+        </div>
+
+        @* ── Configurare: disponibila DOAR inainte de start ───────────────── *@
+        @if (gameState == GameState.Idle)
+        {
+            @* Grid Size *@
+            <div class="mn-section">
+                <span class="mn-lbl">DIMENSIUNE GRILA</span>
+                <div class="mn-grid-btns">
+                    @foreach (var gs in GridSizes)
+                    {
+                        int gsc = gs;
+                        <button class="mn-gs-btn @(gridSize == gsc ? "gs-active" : "")"
+                                @onclick="() => SetGridSize(gsc)">
+                            @gsc
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @* Mines count *@
+            <div class="mn-section">
+                <span class="mn-lbl">NUMAR MINE — <span class="mn-lbl-val">@mineCount</span></span>
+                <div class="mn-slider-row">
+                    <span class="mn-slider-min">1</span>
+                    <input type="range" class="mn-slider" min="1" max="@MaxMines"
+                           value="@mineCount"
+                           @oninput="OnMineSlider" />
+                    <span class="mn-slider-max">@MaxMines</span>
+                </div>
+                <div class="mn-mine-info">
+                    <span>💣 @mineCount mine</span>
+                    <span>💎 @(gridSize - mineCount) sigure</span>
+                </div>
+            </div>
+
+            @* Pariu — chips *@
+            <div class="mn-section">
+                <span class="mn-lbl">MIZA</span>
+                <div class="mn-bet-display">
+                    @if (currentBet > 0)
+                    {
+                        <span class="mn-bet-val">@currentBet RON</span>
+                        <button class="mn-bet-half" @onclick="HalfBet" title="½">½</button>
+                        <button class="mn-bet-dbl"  @onclick="DoubleBet" title="2×"
+                                disabled="@(Session.CurrentPlayer!.Balance < (double)currentBet)">2×</button>
+                    }
+                    else
+                    {
+                        <span class="mn-bet-placeholder">Selecteaza jetoane</span>
+                    }
+                </div>
+                <div class="mn-chips-row">
+                    @foreach (var cv in ChipDenoms)
+                    {
+                        int c = cv;
+                        bool ok = Session.CurrentPlayer!.Balance >= c;
+                        <button class="mn-chip chip-@c @(!ok ? "chip-off" : "")"
+                                @onclick="() => AddChip(c)" disabled="@(!ok)">
+                            <span class="chi">@c</span>
+                            <span class="chcur">RON</span>
+                        </button>
+                    }
+                </div>
+                @if (currentBet > 0)
+                {
+                    <button class="mn-clear-btn" @onclick="ClearBet">✕ STERGE MIZA</button>
+                }
+            </div>
+        }
+
+        @* ── Info in-game ─────────────────────────────────────────────────── *@
+        @if (gameState == GameState.Playing)
+        {
+            <div class="mn-section">
+                <span class="mn-lbl">MIZA</span>
+                <span class="mn-info-val">@currentBet.ToString("F2") RON</span>
+            </div>
+            <div class="mn-section">
+                <span class="mn-lbl">MINE PE TABLA</span>
+                <span class="mn-info-val">💣 @mineCount</span>
+            </div>
+            <div class="mn-section">
+                <span class="mn-lbl">SIGURE DEZVALUITE</span>
+                <span class="mn-info-val">💎 @safeRevealed</span>
+            </div>
+        }
+
+        @* ── Multiplier + potential win ───────────────────────────────────── *@
+        @if (gameState == GameState.Playing)
+        {
+            <div class="mn-mult-box @(safeRevealed > 0 ? "mult-active" : "")">
+                <span class="mn-lbl">MULTIPLICATOR CURENT</span>
+                <span class="mn-mult-val">@currentMultiplier.ToString("F2")×</span>
+                @if (safeRevealed > 0)
+                {
+                    <span class="mn-pot-win">= @((currentBet * (decimal)currentMultiplier).ToString("F2")) RON</span>
+                }
+            </div>
+            <div class="mn-next-box">
+                <span class="mn-lbl">URMATOAREA CELULA (daca e sigura)</span>
+                <span class="mn-next-val">@GetNextMultiplier().ToString("F2")×</span>
+            </div>
+        }
+
+        @* ── Eroare *@
+        @if (!string.IsNullOrEmpty(errorMsg))
+        {
+            <div class="mn-error">@errorMsg</div>
+        }
+
+        @* ── Butoane principale ───────────────────────────────────────────── *@
+        <div class="mn-actions">
+            @if (gameState == GameState.Idle)
+            {
+                <button class="mn-start @(CanStart() ? "" : "mn-off")"
+                        @onclick="StartGame" disabled="@(!CanStart())">
+                    💣 INCEPE JOCUL
+                </button>
+                @if (lastBet > 0 && Session.CurrentPlayer!.Balance >= (double)lastBet && currentBet == 0)
+                {
+                    <button class="mn-rebet" @onclick="Rebet">↺ REBET (@lastBet RON)</button>
+                }
+            }
+            else if (gameState == GameState.Playing)
+            {
+                <button class="mn-cashout @(safeRevealed == 0 ? "mn-off" : "")"
+                        @onclick="CashOut" disabled="@(safeRevealed == 0)">
+                    💰 CASH OUT @((currentBet * (decimal)currentMultiplier).ToString("F2")) RON
+                </button>
+            }
+            else if (gameState == GameState.GameOver || gameState == GameState.CashedOut)
+            {
+                <button class="mn-start @(isResetting ? "mn-off" : "")"
+                        @onclick="NewRound" disabled="@isResetting">
+                    ↺ ROUND NOU
+                </button>
+            }
+        </div>
+
+        @* ── Banner rezultat *@
+        @if (gameState == GameState.GameOver)
+        {
+            <div class="mn-result-banner res-lose">
+                <span class="mn-res-icon">💥</span>
+                <span class="mn-res-msg">MINA! AI PIERDUT</span>
+                <span class="mn-res-amt">-@currentBet.ToString("F2") RON</span>
+            </div>
+        }
+        else if (gameState == GameState.CashedOut)
+        {
+            <div class="mn-result-banner res-win">
+                <span class="mn-res-icon">💎</span>
+                <span class="mn-res-msg">CASH OUT REUSIT!</span>
+                <span class="mn-res-amt">+@cashOutWin.ToString("F2") RON</span>
+            </div>
+        }
+
+    </div>
+
+    @* ══ ZONA JOCULUI ════════════════════════════════════════════════════════ *@
+    <div class="mn-game-area">
+
+        @* Header *@
+        <div class="mn-game-header">
+            <span class="mn-game-title">MINES</span>
+            <span class="mn-game-sub">@gridSize casete · @mineCount mine</span>
+        </div>
+
+        @* GRILA *@
+        <div class="mn-grid" style="--cols: @cols; --cell-size: @CellSizePx;">
+            @for (int i = 0; i < gridSize; i++)
+            {
+                int idx = i;
+                var state = cells.Length > 0 ? cells[idx] : CellState.Hidden;
+                bool clickable = gameState == GameState.Playing && state == CellState.Hidden;
+
+                <div class="mn-cell @GetCellClass(state) @(clickable ? "cell-hover" : "")"
+                     @key="@($"c{idx}g{roundKey}")"
+                     @onclick="() => RevealCell(idx)"
+                     style="--i: @idx;">
+                    @if (state == CellState.Safe)
+                    {
+                        <div class="mn-cell-inner gem-reveal">
+                            <span class="mn-gem">💎</span>
+                            <span class="mn-cell-mult">@GetCellMult(idx)</span>
+                        </div>
+                    }
+                    else if (state == CellState.Mine)
+                    {
+                        <div class="mn-cell-inner mine-reveal">
+                            <span class="mn-bomb">💣</span>
+                        </div>
+                    }
+                    else if (state == CellState.MineBoom)
+                    {
+                        <div class="mn-cell-inner mine-boom">
+                            <span class="mn-boom">💥</span>
+                        </div>
+                    }
+                    else if (state == CellState.SafeUnrevealed)
+                    {
+                        @* celule sigure dezvaluite la game over/cashout *@
+                        <div class="mn-cell-inner safe-ghost">
+                            <span class="mn-gem" style="opacity:0.3">💎</span>
+                        </div>
+                    }
+                    else
+                    {
+                        @* Hidden — animatie puls daca jocul e activ *@
+                        <div class="mn-cell-inner @(gameState == GameState.Playing ? "cell-idle" : "")"></div>
+                    }
+                </div>
+            }
+        </div>
+
+        @* Win chance indicator *@
+        @if (gameState == GameState.Playing)
+        {
+            double winChance = GetWinChance();
+            <div class="mn-win-chance">
+                <span class="mn-lbl" style="font-size:0.58rem">SANSA URMATOAREI CELULE SIGURE</span>
+                <div class="mn-chance-bar-wrap">
+                    <div class="mn-chance-bar" style="width: @(winChance.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;
+                                                        background: @GetChanceColor(winChance);"></div>
+                </div>
+                <span class="mn-chance-val" style="color: @GetChanceColor(winChance);">@winChance.ToString("F1")%</span>
+            </div>
+        }
+
+    </div>
+
+</div>
+
+@code {
+
+    // ── Tipuri ────────────────────────────────────────────────────────────
+    private enum GameState  { Idle, Playing, GameOver, CashedOut }
+    private enum CellState  { Hidden, Safe, Mine, MineBoom, SafeUnrevealed }
+
+    // ── Config ────────────────────────────────────────────────────────────
+    private static readonly int[] GridSizes  = { 25, 36, 49, 64 };
+    private static readonly int[] ChipDenoms = { 1, 5, 10, 25, 50, 100 };
+
+    // ── Stare joc ─────────────────────────────────────────────────────────
+    private GameState  gameState    = GameState.Idle;
+    private int        gridSize     = 25;
+    private int        cols         => (int)Math.Sqrt(gridSize);
+    private int        mineCount    = 3;
+    private int        MaxMines     => gridSize - 2;   // cel putin 2 celule sigure
+    private int        roundKey     = 0;
+    private bool       isResetting  = false;
+
+    // ── Celule ────────────────────────────────────────────────────────────
+    private CellState[]     cells       = Array.Empty<CellState>();
+    private HashSet<int>    mineSet     = new();
+    private int             safeRevealed = 0;
+    // Retinem multiplicatorul la care a fost dezvaluita fiecare celula sigura
+    private Dictionary<int, double> cellMultipliers = new();
+
+    // ── Pariu ─────────────────────────────────────────────────────────────
+    private decimal currentBet = 0;
+    private decimal lastBet    = 0;
+    private decimal cashOutWin = 0;
+
+    // ── Multiplier ────────────────────────────────────────────────────────
+    private double currentMultiplier = 1.0;
+
+    // ── Mesaje ────────────────────────────────────────────────────────────
+    private string errorMsg = "";
+
+    // ── Marimea celulei in functie de grid ───────────────────────────────
+    private string CellSizePx => gridSize switch
+    {
+        25 => "90px",
+        36 => "76px",
+        49 => "64px",
+        _  => "54px"  // 64
+    };
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────
+    protected override void OnInitialized() => Session.OnChange += OnSessionChanged;
+    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose()           => Session.OnChange -= OnSessionChanged;
+
+    // ── Configurare ───────────────────────────────────────────────────────
+    private void SetGridSize(int gs)
+    {
+        gridSize  = gs;
+        mineCount = Math.Min(mineCount, MaxMines);
+    }
+
+    private void OnMineSlider(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int v))
+            mineCount = Math.Clamp(v, 1, MaxMines);
+    }
+
+    // ── Jetoane ───────────────────────────────────────────────────────────
+    private void AddChip(int v)
+    {
+        if (Session.CurrentPlayer!.Balance < (double)(currentBet + v))
+        { errorMsg = "Balanta insuficienta!"; return; }
+        errorMsg = "";
+        currentBet += v;
+    }
+
+    private void ClearBet()  { currentBet = 0; errorMsg = ""; }
+    private void HalfBet()   { currentBet = Math.Max(1, Math.Floor(currentBet / 2)); }
+    private void DoubleBet()
+    {
+        decimal doubled = currentBet * 2;
+        if (Session.CurrentPlayer!.Balance < (double)doubled)
+        { errorMsg = "Balanta insuficienta pentru dublare!"; return; }
+        currentBet = doubled;
+    }
+    private void Rebet()
+    {
+        if (Session.CurrentPlayer!.Balance < (double)lastBet) return;
+        currentBet = lastBet;
+        errorMsg   = "";
+    }
+
+    private bool CanStart() =>
+        currentBet > 0 &&
+        Session.CurrentPlayer!.Balance >= (double)currentBet;
+
+    // ── START ─────────────────────────────────────────────────────────────
+    private void StartGame()
+    {
+        if (!CanStart()) return;
+
+        // Deduce pariul
+        var newBal = Session.CurrentPlayer!.Balance - (double)currentBet;
+        Session.UpdateBalance(newBal);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+
+        // Plaseaza minele aleatoriu
+        var rng  = new Random();
+        mineSet  = new HashSet<int>();
+        while (mineSet.Count < mineCount)
+            mineSet.Add(rng.Next(gridSize));
+
+        cells            = new CellState[gridSize]; // toate Hidden (default)
+        cellMultipliers  = new();
+        safeRevealed     = 0;
+        currentMultiplier = 1.0;
+        cashOutWin       = 0;
+        errorMsg         = "";
+        gameState        = GameState.Playing;
+        roundKey++;
+    }
+
+    // ── REVEAL CELULA ─────────────────────────────────────────────────────
+    private void RevealCell(int idx)
+    {
+        if (gameState != GameState.Playing) return;
+        if (cells[idx] != CellState.Hidden) return;
+
+        if (mineSet.Contains(idx))
+        {
+            // MINA! Marcheaza cea explodata si dezvaluie restul
+            cells[idx] = CellState.MineBoom;
+            RevealAllMines();
+            RevealAllSafes();
+            gameState = GameState.GameOver;
+        }
+        else
+        {
+            safeRevealed++;
+            currentMultiplier = GetMultiplier(gridSize, mineCount, safeRevealed);
+            cellMultipliers[idx] = currentMultiplier;
+            cells[idx] = CellState.Safe;
+
+            // Daca a dezvaluit toate celulele sigure — auto cashout
+            if (safeRevealed == gridSize - mineCount)
+                CashOut();
+        }
+    }
+
+    // ── CASH OUT ──────────────────────────────────────────────────────────
+    private void CashOut()
+    {
+        if (gameState != GameState.Playing || safeRevealed == 0) return;
+
+        cashOutWin = Math.Round(currentBet * (decimal)currentMultiplier, 2);
+        var newBal = Session.CurrentPlayer!.Balance + (double)cashOutWin;
+        Session.UpdateBalance(newBal);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+
+        lastBet   = currentBet;
+        currentBet = 0;
+
+        // Dezvaluie restul
+        RevealAllMines();
+        RevealAllSafes();
+        gameState = GameState.CashedOut;
+    }
+
+    // ── REVEAL HELPERS ────────────────────────────────────────────────────
+    private void RevealAllMines()
+    {
+        for (int i = 0; i < gridSize; i++)
+            if (mineSet.Contains(i) && cells[i] == CellState.Hidden)
+                cells[i] = CellState.Mine;
+    }
+
+    private void RevealAllSafes()
+    {
+        for (int i = 0; i < gridSize; i++)
+            if (!mineSet.Contains(i) && cells[i] == CellState.Hidden)
+                cells[i] = CellState.SafeUnrevealed;
+    }
+
+    // ── ROUND NOU ─────────────────────────────────────────────────────────
+    private async Task NewRound()
+    {
+        isResetting = true;
+        await Task.Delay(300);
+        cells            = Array.Empty<CellState>();
+        mineSet          = new();
+        cellMultipliers  = new();
+        safeRevealed     = 0;
+        currentMultiplier = 1.0;
+        cashOutWin       = 0;
+        errorMsg         = "";
+        gameState        = GameState.Idle;
+        isResetting      = false;
+    }
+
+    // ── MATEMATICA ───────────────────────────────────────────────────────
+    // Multiplier = 0.99 × C(N, K) / C(N-M, K)
+    // log ratio = sum_{i=0}^{K-1} [log(N-i) - log(N-M-i)]  (evita overflow)
+    private double GetMultiplier(int N, int M, int K)
+    {
+        if (K <= 0) return 1.0;
+        double logRatio = 0;
+        for (int i = 0; i < K; i++)
+            logRatio += Math.Log(N - i) - Math.Log(N - M - i);
+        return 0.99 * Math.Exp(logRatio);
+    }
+
+    private double GetNextMultiplier() =>
+        GetMultiplier(gridSize, mineCount, safeRevealed + 1);
+
+    // Sansa ca urmatoarea celula sa fie sigura
+    private double GetWinChance()
+    {
+        int remaining = gridSize - safeRevealed;
+        int minesLeft = mineCount; // minele nu se dezvaluie in play
+        int safesLeft = remaining - minesLeft;
+        if (remaining <= 0) return 0;
+        return 100.0 * safesLeft / remaining;
+    }
+
+    // ── HELPERS UI ────────────────────────────────────────────────────────
+    private string GetCellClass(CellState s) => s switch
+    {
+        CellState.Safe          => "cell-safe",
+        CellState.Mine          => "cell-mine",
+        CellState.MineBoom      => "cell-boom",
+        CellState.SafeUnrevealed=> "cell-safe-ghost",
+        _                       => "cell-hidden"
+    };
+
+    private string GetCellMult(int idx) =>
+        cellMultipliers.TryGetValue(idx, out double m) ? m.ToString("F2") + "×" : "";
+
+    private string GetChanceColor(double p) => p switch
+    {
+        >= 70 => "#2ecc71",
+        >= 45 => "#f39c12",
+        >= 20 => "#e67e22",
+        _      => "#e74c3c"
+    };
+}
+
+<style>
+    /* ── MASA ─────────────────────────────────────────────────────────────── */
+    .mn-table {
+        display: flex; flex-direction: row; gap: 0;
+        min-height: 640px;
+        font-family: 'Rajdhani', sans-serif; color: #f0e6d3;
+        background: radial-gradient(ellipse 120% 80% at 30% 50%,
+            #0a0e1a 0%, #070a12 55%, #030509 100%);
+        border-radius: 0 0 8px 8px; overflow: hidden;
+        position: relative;
+    }
+    /* Textura subtila albastra */
+    .mn-table::before {
+        content:''; position:absolute; inset:0; pointer-events:none;
+        background-image:
+            repeating-linear-gradient( 45deg,transparent,transparent 50px,rgba(99,179,237,0.008) 50px,rgba(99,179,237,0.008) 51px),
+            repeating-linear-gradient(-45deg,transparent,transparent 50px,rgba(99,179,237,0.008) 50px,rgba(99,179,237,0.008) 51px);
+    }
+
+    /* ── SIDEBAR STANGA ───────────────────────────────────────────────────── */
+    .mn-sidebar {
+        width: 280px; min-width: 260px; flex-shrink: 0;
+        display: flex; flex-direction: column; gap: 12px;
+        padding: 24px 20px;
+        background: rgba(0,0,0,0.35);
+        border-right: 1px solid rgba(255,255,255,0.05);
+        overflow-y: auto;
+    }
+
+    /* Balanta **/
+    .mn-bal-box { display:flex; flex-direction:column; gap:2px; margin-bottom:4px; }
+    .mn-lbl     { display:block; font-size:0.6rem; letter-spacing:3px; color:#3a4a6a; font-weight:700; text-transform:uppercase; }
+    .mn-lbl-val { color:#63b3ed; font-weight:700; }
+    .mn-bal-val { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; color:#D4AF37; letter-spacing:2px; }
+
+    /* Sectiune **/
+    .mn-section { display:flex; flex-direction:column; gap:7px; }
+
+    /* Grid size buttons **/
+    .mn-grid-btns { display:flex; gap:6px; }
+    .mn-gs-btn {
+        flex:1; height:36px; border-radius:6px;
+        font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:1px;
+        cursor:pointer; transition:all 0.15s;
+        background:rgba(255,255,255,0.04);
+        border:1px solid rgba(255,255,255,0.08);
+        color:#555;
+    }
+    .mn-gs-btn:hover  { border-color:rgba(99,179,237,0.4); color:#63b3ed; background:rgba(99,179,237,0.07); }
+    .mn-gs-btn.gs-active { background:rgba(99,179,237,0.2); border-color:#63b3ed; color:#63b3ed; box-shadow:0 0 12px rgba(99,179,237,0.3); }
+
+    /* Slider mine count **/
+    .mn-slider-row { display:flex; align-items:center; gap:8px; }
+    .mn-slider-min,.mn-slider-max { font-family:'Bebas Neue',sans-serif; font-size:0.85rem; color:#444; width:18px; text-align:center; }
+    .mn-slider {
+        flex:1; height:6px; border-radius:3px;
+        -webkit-appearance:none; appearance:none;
+        background: linear-gradient(to right, #e74c3c 0%, #e74c3c calc(var(--val, 50%)), rgba(255,255,255,0.1) calc(var(--val, 50%)));
+        outline:none; cursor:pointer;
+    }
+    .mn-slider::-webkit-slider-thumb {
+        -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+        background:#e74c3c; border:2px solid #fff; box-shadow:0 0 8px rgba(231,76,60,0.6);
+        cursor:pointer;
+    }
+    .mn-slider::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:#e74c3c; border:2px solid #fff; cursor:pointer; }
+    .mn-mine-info { display:flex; justify-content:space-between; font-size:0.78rem; color:#556; }
+
+    /* Pariu **/
+    .mn-bet-display {
+        display:flex; align-items:center; gap:6px;
+        min-height:36px; padding:0 10px;
+        background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.07); border-radius:6px;
+    }
+    .mn-bet-val         { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#D4AF37; flex:1; }
+    .mn-bet-placeholder { font-size:0.75rem; color:#333; flex:1; }
+    .mn-bet-half, .mn-bet-dbl {
+        padding:3px 8px; border-radius:4px; border:none; cursor:pointer;
+        font-family:'Bebas Neue',sans-serif; font-size:0.75rem; letter-spacing:1px;
+        background:rgba(255,255,255,0.07); color:#888; transition:all 0.15s;
+    }
+    .mn-bet-half:hover    { background:rgba(255,255,255,0.12); color:#f0e6d3; }
+    .mn-bet-dbl:hover     { background:rgba(212,175,55,0.15); color:#D4AF37; }
+    .mn-bet-dbl:disabled  { opacity:0.3; cursor:not-allowed; }
+
+    /* Chips **/
+    .mn-chips-row { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; }
+    .mn-chip {
+        width:44px; height:44px; border-radius:50%; border:none; cursor:pointer;
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        transition:all 0.15s; position:relative; overflow:hidden;
+        box-shadow:0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .mn-chip::before { content:''; position:absolute; inset:3px; border-radius:50%; border:1.5px dashed rgba(255,255,255,0.2); }
+    .mn-chip:hover:not(.chip-off)  { transform:translateY(-3px) scale(1.08); }
+    .mn-chip.chip-off { opacity:0.25; cursor:not-allowed; }
+    .chi   { font-family:'Bebas Neue',sans-serif; font-size:0.95rem; color:white; line-height:1; }
+    .chcur { font-size:0.42rem; letter-spacing:1px; color:rgba(255,255,255,0.7); line-height:1; }
+    .mn-chip.chip-1   { background:linear-gradient(160deg,#bbb,#888); }
+    .mn-chip.chip-5   { background:linear-gradient(160deg,#e74c3c,#c0392b); }
+    .mn-chip.chip-10  { background:linear-gradient(160deg,#3498db,#2980b9); }
+    .mn-chip.chip-25  { background:linear-gradient(160deg,#27ae60,#1e8449); }
+    .mn-chip.chip-50  { background:linear-gradient(160deg,#e67e22,#d35400); }
+    .mn-chip.chip-100 { background:linear-gradient(160deg,#9b59b6,#6c3483); }
+
+    .mn-clear-btn {
+        width:100%; padding:7px; border-radius:5px; border:1px solid rgba(231,76,60,0.2);
+        background:transparent; color:#555; font-family:'Rajdhani',sans-serif;
+        font-size:0.72rem; letter-spacing:1px; cursor:pointer; transition:all 0.15s;
+    }
+    .mn-clear-btn:hover { border-color:rgba(231,76,60,0.5); color:#e74c3c; }
+
+    /* Info in-game **/
+    .mn-info-val { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; color:#f0e6d3; letter-spacing:1px; }
+
+    /* Multiplier box **/
+    .mn-mult-box {
+        padding:12px; border-radius:8px;
+        background:rgba(0,0,0,0.3);
+        border:1px solid rgba(255,255,255,0.06);
+        display:flex; flex-direction:column; gap:3px;
+        transition:all 0.3s;
+    }
+    .mn-mult-box.mult-active {
+        border-color:rgba(212,175,55,0.35);
+        background:rgba(212,175,55,0.06);
+        box-shadow:0 0 20px rgba(212,175,55,0.15);
+    }
+    .mn-mult-val { font-family:'Bebas Neue',sans-serif; font-size:2rem; color:#D4AF37; letter-spacing:2px; line-height:1; }
+    .mn-pot-win  { font-size:0.85rem; color:#2ecc71; font-weight:600; }
+
+    .mn-next-box { padding:8px 12px; border-radius:6px; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; gap:2px; }
+    .mn-next-val { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#63b3ed; letter-spacing:1px; }
+
+    /* Eroare **/
+    .mn-error { color:#e74c3c; font-size:0.72rem; letter-spacing:0.5px; }
+
+    /* Actiuni **/
+    .mn-actions { display:flex; flex-direction:column; gap:8px; }
+    .mn-start, .mn-cashout, .mn-rebet {
+        width:100%; padding:14px; border:none; border-radius:8px;
+        font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:3px;
+        cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .mn-start {
+        background:linear-gradient(135deg,#e74c3c 0%,#c0392b 100%);
+        color:#fff; box-shadow:0 6px 20px rgba(231,76,60,0.35), 0 2px 0 #7b241c;
+    }
+    .mn-start:hover:not(.mn-off) { background:linear-gradient(135deg,#ff6b6b 0%,#e74c3c 100%); transform:translateY(-2px); }
+    .mn-cashout {
+        background:linear-gradient(135deg,#D4AF37 0%,#b8960c 100%);
+        color:#080808; box-shadow:0 6px 20px rgba(212,175,55,0.4), 0 2px 0 #8a6900;
+        font-size:0.9rem; padding:12px;
+    }
+    .mn-cashout:hover:not(.mn-off) { background:linear-gradient(135deg,#e8c84a 0%,#D4AF37 100%); transform:translateY(-2px); }
+    .mn-rebet {
+        background:transparent; border:1px solid rgba(255,255,255,0.12);
+        color:#666; font-family:'Rajdhani',sans-serif; font-size:0.78rem; font-weight:700; letter-spacing:1px; padding:10px;
+    }
+    .mn-rebet:hover { border-color:rgba(212,175,55,0.4); color:#D4AF37; }
+    .mn-off { opacity:0.3; cursor:not-allowed !important; transform:none !important; }
+
+    /* Banner rezultat **/
+    .mn-result-banner {
+        display:flex; flex-direction:column; align-items:center; gap:4px;
+        padding:12px; border-radius:8px; text-align:center;
+        animation:resPop 0.4s cubic-bezier(0.22,1,0.36,1);
+    }
+    @@keyframes resPop { from{transform:scale(0.7);opacity:0;}to{transform:scale(1);opacity:1;} }
+    .mn-result-banner.res-win  { background:rgba(39,174,96,0.1);  border:1px solid rgba(39,174,96,0.35); }
+    .mn-result-banner.res-lose { background:rgba(231,76,60,0.1);  border:1px solid rgba(231,76,60,0.3); }
+    .mn-res-icon { font-size:1.6rem; line-height:1; }
+    .mn-res-msg  { font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:3px; color:#f0e6d3; }
+    .mn-res-amt  { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; }
+    .res-win  .mn-res-amt { color:#2ecc71; }
+    .res-lose .mn-res-amt { color:#e74c3c; }
+
+    /* ══ ZONA JOCULUI ════════════════════════════════════════════════════════ */
+    .mn-game-area {
+        flex:1; display:flex; flex-direction:column; align-items:center;
+        justify-content:center; gap:16px;
+        padding:24px 20px 28px;
+    }
+
+    /* Header joc **/
+    .mn-game-header { display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .mn-game-title  { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:6px; color:#D4AF37; text-shadow:0 0 20px rgba(212,175,55,0.3); }
+    .mn-game-sub    { font-size:0.65rem; letter-spacing:3px; color:#3a4a6a; }
+
+    /* ── GRID ─────────────────────────────────────────────────────────────── */
+    .mn-grid {
+        display:grid;
+        grid-template-columns: repeat(var(--cols), var(--cell-size));
+        grid-template-rows:    repeat(var(--cols), var(--cell-size));
+        gap:6px;
+    }
+
+    /* ── CELULA ───────────────────────────────────────────────────────────── */
+    .mn-cell {
+        width: var(--cell-size);
+        height: var(--cell-size);
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+        cursor: default;
+        animation: cellAppear 0.4s cubic-bezier(0.22,1,0.36,1) both;
+        animation-delay: calc(var(--i) * 8ms);
+    }
+    @@keyframes cellAppear {
+        from { transform:scale(0.6); opacity:0; }
+        to   { transform:scale(1);   opacity:1; }
+    }
+
+    .mn-cell-inner {
+        width:100%; height:100%;
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        gap:2px; border-radius:10px;
+    }
+
+    /* Hidden **/
+    .cell-hidden .mn-cell-inner {
+        background: linear-gradient(145deg, #1e2744 0%, #151d36 100%);
+        border: 1px solid rgba(99,179,237,0.1);
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(255,255,255,0.04);
+    }
+    /* Puls discret pe celulele ascunse in play **/
+    .cell-idle {
+        background: linear-gradient(145deg, #1e2744 0%, #151d36 100%);
+        border: 1px solid rgba(99,179,237,0.1);
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(255,255,255,0.04);
+    }
+
+    /* Hover celule clickabile **/
+    .cell-hover { cursor:pointer; }
+    .cell-hover:hover .mn-cell-inner {
+        background: linear-gradient(145deg, #2a3860 0%, #1e2e52 100%);
+        border-color: rgba(99,179,237,0.4);
+        box-shadow: 0 0 14px rgba(99,179,237,0.25), inset 0 2px 4px rgba(0,0,0,0.3);
+        transform: scale(1.04);
+        transition: all 0.1s;
+    }
+    .cell-hover:active .mn-cell-inner { transform:scale(0.97); }
+
+    /* SAFE — gem cu glow verde **/
+    .cell-safe { animation: cellAppear 0.4s cubic-bezier(0.22,1,0.36,1) both !important; }
+    .gem-reveal {
+        background: linear-gradient(145deg, #0d2818 0%, #0a1f12 100%);
+        border: 1px solid rgba(46,204,113,0.5);
+        box-shadow: 0 0 16px rgba(46,204,113,0.3), inset 0 1px 0 rgba(46,204,113,0.2);
+        animation: gemPop 0.35s cubic-bezier(0.22,1,0.36,1);
+    }
+    @@keyframes gemPop {
+        from { transform:scale(0.5) rotate(-15deg); opacity:0; }
+        to   { transform:scale(1) rotate(0deg);     opacity:1; }
+    }
+    .mn-gem       { font-size:1.5rem; line-height:1; filter:drop-shadow(0 0 6px rgba(46,204,113,0.8)); }
+    .mn-cell-mult { font-family:'Bebas Neue',sans-serif; font-size:0.62rem; color:rgba(46,204,113,0.8); letter-spacing:1px; line-height:1; }
+
+    /* MINA dezvaluita (restul, la sfarsit) **/
+    .cell-mine .mine-reveal {
+        background: linear-gradient(145deg, #2a0a0a 0%, #1a0606 100%);
+        border: 1px solid rgba(231,76,60,0.3);
+        box-shadow: 0 0 10px rgba(231,76,60,0.2);
+    }
+    .mn-bomb { font-size:1.4rem; line-height:1; opacity:0.7; }
+
+    /* MINA explodata (cea click-ata) — animatie mare **/
+    .cell-boom .mine-boom {
+        background: linear-gradient(145deg, #3a0a0a 0%, #250606 100%);
+        border: 2px solid rgba(231,76,60,0.8);
+        box-shadow: 0 0 30px rgba(231,76,60,0.7), 0 0 60px rgba(231,76,60,0.3);
+        animation: boomFlash 0.4s ease-out;
+    }
+    @@keyframes boomFlash {
+        0%  { transform:scale(1.3); box-shadow:0 0 60px rgba(231,76,60,1); }
+        50% { transform:scale(0.9); }
+        100%{ transform:scale(1);   }
+    }
+    .mn-boom { font-size:1.8rem; line-height:1; animation:boomSpin 0.4s ease-out; filter:drop-shadow(0 0 12px rgba(231,76,60,0.9)); }
+    @@keyframes boomSpin {
+        from{ transform:rotate(-20deg) scale(1.5); }
+        to  { transform:rotate(0deg)  scale(1);   }
+    }
+
+    /* SAFE nepickat dezvaluit la sfarsit **/
+    .cell-safe-ghost .safe-ghost {
+        background:rgba(0,0,0,0.3);
+        border:1px solid rgba(46,204,113,0.12);
+    }
+
+    /* ── WIN CHANCE BAR ───────────────────────────────────────────────────── */
+    .mn-win-chance {
+        display:flex; flex-direction:column; align-items:center; gap:5px;
+        width:100%; max-width:600px;
+    }
+    .mn-chance-bar-wrap {
+        width:100%; height:6px; border-radius:3px;
+        background:rgba(255,255,255,0.06); overflow:hidden;
+    }
+    .mn-chance-bar { height:100%; border-radius:3px; transition:width 0.4s ease, background 0.4s ease; }
+    .mn-chance-val { font-family:'Bebas Neue',sans-serif; font-size:0.9rem; letter-spacing:2px; }
+
+    /* ── RESPONSIVE ───────────────────────────────────────────────────────── */
+    @@media (max-width:700px) {
+        .mn-table    { flex-direction:column; }
+        .mn-sidebar  { width:100%; min-width:unset; border-right:none; border-bottom:1px solid rgba(255,255,255,0.05); }
+        .mn-chips-row{ justify-content:flex-start; }
+        .mn-grid     { gap:4px; }
+    }
+</style>
