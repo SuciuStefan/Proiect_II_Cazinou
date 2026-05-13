@@ -31,10 +31,7 @@
         <div class="topbar-left">
             <div class="logo"><span class="logo-epic">EPIC</span><span class="logo-spin">SPIN</span></div>
             <nav class="topnav">
-                <a class="topnav-link @(activePage=="sports"?"active":"")"  @onclick='()=>activePage="sports"'>Sport</a>
-                <a class="topnav-link @(activePage=="live"?"active":"")"    @onclick='()=>activePage="live"'>Live <span class="badge">12</span></a>
-                <a class="topnav-link @(activePage=="casino"?"active":"")"  @onclick='()=>activePage="casino"'>Casino</a>
-                <a class="topnav-link @(activePage=="clive"?"active":"")"   @onclick='()=>activePage="clive"'>Casino Live</a>
+
             </nav>
         </div>
         <div class="topbar-right">
@@ -68,7 +65,40 @@
                     <div class="up-divider"></div>
                     <a class="up-menu-item" href="#">⚙ Setări cont</a>
                     <a class="up-menu-item" href="#">📜 Istoric tranzacții</a>
-                    <a class="up-menu-item" href="#">🎁 Bonusuri active</a>
+                    <div class="bonus-wrap">
+                        <span class="up-menu-item bonus-trigger">🎁 Bonusuri active <span class="bonus-count">1</span></span>
+                        <div class="bonus-tooltip">
+                            <div class="bt-header">
+                                <span class="bt-icon">🎁</span>
+                                <div>
+                                    <div class="bt-title">BONUS ACTIV</div>
+                                    <div class="bt-sub">Bonus la înregistrare</div>
+                                </div>
+                            </div>
+                            <div class="bt-divider"></div>
+                            <div class="bt-row">
+                                <span class="bt-lbl">Valoare bonus</span>
+                                <span class="bt-val gold">100% până la 500 RON</span>
+                            </div>
+                            <div class="bt-row">
+                                <span class="bt-lbl">Rulaj necesar</span>
+                                <span class="bt-val">35× valoarea bonusului</span>
+                            </div>
+                            <div class="bt-row">
+                                <span class="bt-lbl">Valabil până la</span>
+                                <span class="bt-val">30 zile de la activare</span>
+                            </div>
+                            <div class="bt-row">
+                                <span class="bt-lbl">Jocuri eligibile</span>
+                                <span class="bt-val">Slots, Ruleta, Blackjack</span>
+                            </div>
+                            <div class="bt-divider"></div>
+                            <div class="bt-footer">
+                                <span class="bt-status active">● ACTIV</span>
+                                <span class="bt-tip">Depune pentru a activa</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="up-divider"></div>
                     <button class="up-logout" @onclick="Logout">⏻ Deconectare</button>
                 </div>
@@ -109,7 +139,40 @@
                     <div class="up-divider"></div>
                     <a class="up-menu-item" href="#">⚙ Setări cont</a>
                     <a class="up-menu-item" href="#">📜 Istoric tranzacții</a>
-                    <a class="up-menu-item" href="#">🎁 Bonusuri active</a>
+                    <div class="bonus-wrap">
+                        <span class="up-menu-item bonus-trigger">🎁 Bonusuri active <span class="bonus-count">1</span></span>
+                        <div class="bonus-tooltip">
+                            <div class="bt-header">
+                                <span class="bt-icon">🎁</span>
+                                <div>
+                                    <div class="bt-title">BONUS ACTIV</div>
+                                    <div class="bt-sub">Bonus la înregistrare</div>
+                                </div>
+                            </div>
+                            <div class="bt-divider"></div>
+                            <div class="bt-row">
+                                <span class="bt-lbl">Valoare bonus</span>
+                                <span class="bt-val gold">100% până la 500 RON</span>
+                            </div>
+                            <div class="bt-row">
+                                <span class="bt-lbl">Rulaj necesar</span>
+                                <span class="bt-val">35× valoarea bonusului</span>
+                            </div>
+                            <div class="bt-row">
+                                <span class="bt-lbl">Valabil până la</span>
+                                <span class="bt-val">30 zile de la activare</span>
+                            </div>
+                            <div class="bt-row">
+                                <span class="bt-lbl">Jocuri eligibile</span>
+                                <span class="bt-val">Slots, Ruleta, Blackjack</span>
+                            </div>
+                            <div class="bt-divider"></div>
+                            <div class="bt-footer">
+                                <span class="bt-status active">● ACTIV</span>
+                                <span class="bt-tip">Depune pentru a activa</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="up-divider"></div>
                     <button class="up-logout" @onclick="Logout">⏻ Deconectare</button>
                 </div>
@@ -524,6 +587,82 @@ public void Dispose()
     .ga-close:hover{color:var(--red);}
     .ga-placeholder{padding:300px 20px;text-align:center;color:#444;font-size:0.95rem;line-height:2.2;}
     .ga-placeholder strong{color:#888;}
+
+    /* ── BONUS TOOLTIP ──────────────────────────────────────────────────────── */
+    .bonus-wrap {
+        position: relative;
+    }
+
+    /* Numarul de bonusuri active — badge mic auriu */
+    .bonus-trigger { display:flex; align-items:center; gap:6px; cursor: default; }
+    .bonus-count {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 18px; height: 18px; border-radius: 50%;
+        background: var(--gold); color: #080808;
+        font-size: 0.65rem; font-weight: 700; font-family: var(--fb);
+        margin-left: auto; flex-shrink: 0;
+    }
+
+    /* Cardul flotant — ascuns by default, apare la STANGA panoului */
+    .bonus-tooltip {
+        position: absolute;
+        right: calc(100% + 10px);
+        top: 50%;
+        transform: translateY(-50%) translateX(6px);
+        width: 270px;
+        background: #141414;
+        border: 1px solid rgba(212,175,55,0.3);
+        border-radius: 10px;
+        padding: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,0,0,0.5);
+        z-index: 3000;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    /* Sageata dreapta — arata spre panel */
+    .bonus-tooltip::before {
+        content: '';
+        position: absolute;
+        right: -7px; top: 50%;
+        transform: translateY(-50%);
+        border-width: 6px 0 6px 7px;
+        border-style: solid;
+        border-color: transparent transparent transparent rgba(212,175,55,0.3);
+    }
+    .bonus-tooltip::after {
+        content: '';
+        position: absolute;
+        right: -5px; top: 50%;
+        transform: translateY(-50%);
+        border-width: 5px 0 5px 6px;
+        border-style: solid;
+        border-color: transparent transparent transparent #141414;
+    }
+
+    /* Apare la hover pe wrapper */
+    .bonus-wrap:hover .bonus-tooltip {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+        pointer-events: auto;
+    }
+
+
+    /* Continut tooltip */
+    .bt-header { display:flex; align-items:center; gap:10px; margin-bottom:2px; }
+    .bt-icon   { font-size:1.6rem; line-height:1; }
+    .bt-title  { font-family:var(--fh); font-size:0.95rem; letter-spacing:2px; color:var(--white); }
+    .bt-sub    { font-size:0.7rem; color:#555; letter-spacing:0.5px; margin-top:1px; }
+    .bt-divider{ height:1px; background:var(--border); margin:10px 0; }
+    .bt-row    { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:7px; }
+    .bt-lbl    { font-size:0.7rem; color:#555; letter-spacing:0.5px; flex-shrink:0; }
+    .bt-val    { font-size:0.75rem; color:#aaa; text-align:right; font-weight:600; }
+    .bt-val.gold { color:var(--gold); }
+    .bt-footer { display:flex; justify-content:space-between; align-items:center; }
+    .bt-status { font-size:0.68rem; letter-spacing:1.5px; font-weight:700; }
+    .bt-status.active { color:#27ae60; }
+    .bt-tip    { font-size:0.65rem; color:#444; font-style:italic; }
 </style>
 
 <!-- JavaScript pentru scroll si smooth scroll -->
