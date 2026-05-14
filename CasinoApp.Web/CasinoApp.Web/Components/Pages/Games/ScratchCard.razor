@@ -381,10 +381,8 @@ window.scratchCardGame = (function () {
         if (selectedCost == 0)                              { errorMsg = "Alege un bilet mai intai!"; return; }
         if (Session.CurrentPlayer!.Balance < selectedCost)  { errorMsg = "Balanta insuficienta!";    return; }
 
-        var newBalance = Session.CurrentPlayer.Balance - selectedCost;
-
-PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
-Session.UpdateBalance(newBalance);
+        Session.CurrentPlayer.Balance -= selectedCost;
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, Session.CurrentPlayer.Balance);
 
         GenerateGrid();
         winningRows  = new();
@@ -427,10 +425,8 @@ Session.UpdateBalance(newBalance);
 
         if (totalWin > 0)
         {
-            var newBalance = Session.CurrentPlayer!.Balance + totalWin;
-
-            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
-            Session.UpdateBalance(newBalance);
+            Session.CurrentPlayer!.Balance += totalWin;
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, Session.CurrentPlayer.Balance);
         }
     }
 

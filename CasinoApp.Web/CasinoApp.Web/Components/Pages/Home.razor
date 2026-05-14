@@ -1,5 +1,4 @@
 @page "/Home"
-@implements IDisposable
 @rendermode InteractiveServer
 @inject NavigationManager NavManager
 @inject CasinoApp.Web.Services.SessionService Session
@@ -292,21 +291,6 @@
     // Pentru confirmarea schimbarii jocului
     private bool   showConfirm  = false;
     private string pendingGame  = "";
-
-    protected override void OnInitialized()
-{
-    Session.OnChange += RefreshBalance;
-}
-
-private void RefreshBalance()
-{
-    InvokeAsync(StateHasChanged);
-}
-
-public void Dispose()
-{
-    Session.OnChange -= RefreshBalance;
-}
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

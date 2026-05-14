@@ -7,10 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MailKit" Version="4.16.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\CasinoApp.DataAccess\CasinoApp.DataAccess.csproj" />
   </ItemGroup>
 

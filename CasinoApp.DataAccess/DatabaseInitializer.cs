@@ -82,15 +82,6 @@ namespace CasinoApp.DataAccess
                     FOREIGN KEY (PlayerId) REFERENCES Players(Id) ON DELETE CASCADE,
                     FOREIGN KEY (GameId) REFERENCES Games(Id) ON DELETE CASCADE
                 );
-                CREATE TABLE IF NOT EXISTS PasswordResetTokens (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    PlayerId INTEGER NOT NULL,
-                    Token TEXT NOT NULL UNIQUE,
-                    ExpiresAt TEXT NOT NULL,
-                    IsUsed INTEGER NOT NULL DEFAULT 0,
-                    CreatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (PlayerId) REFERENCES Players(Id) ON DELETE CASCADE
-                );
 
                 CREATE INDEX IF NOT EXISTS IX_GameSessions_PlayerId ON GameSessions(PlayerId);
                 CREATE INDEX IF NOT EXISTS IX_GameSessions_GameId ON GameSessions(GameId);
