@@ -1,12 +1,145 @@
 @page "/Home"
 @implements IDisposable
 @rendermode InteractiveServer
+@using CasinoApp.DataAccess.DB_operations
+@using CasinoApp.DataAccess.Entities
 @inject NavigationManager NavManager
 @inject CasinoApp.Web.Services.SessionService Session
 @inject IJSRuntime JS
 
 <PageTitle>Epic Spin – Casino</PageTitle>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+@if (showWalletModal)
+{
+    <div class="wallet-overlay" @onclick="CloseWalletModal">
+        <div class="wallet-modal" @onclick:stopPropagation="true">
+
+            <button type="button" class="wallet-close" @onclick="CloseWalletModal">×</button>
+
+            <div class="wallet-icon">
+                @(walletMode == "deposit" ? "💳" : "💸")
+            </div>
+
+            <h2>@(walletMode == "deposit" ? "Depunere fonduri" : "Retragere fonduri")</h2>
+
+            <p class="wallet-subtitle">
+                @(walletMode == "deposit"
+                    ? "Adaugă bani în contul tău EpicSpin."
+                    : "Retrage o sumă din balanța contului tău.")
+            </p>
+
+            @if (Session.CurrentPlayer != null)
+            {
+                <div class="wallet-balance-box">
+                    <span>Balanță curentă</span>
+                    <strong>@Session.CurrentPlayer.Balance.ToString("F2") RON</strong>
+                </div>
+            }
+
+            <div class="wallet-input-group">
+                <label>Suma</label>
+                <input type="number"
+                       min="1"
+                       step="1"
+                       @bind="walletAmount"
+                       placeholder="Introdu suma în RON" />
+            </div>
+
+            <div class="wallet-quick">
+                <button type="button" @onclick="() => SetWalletAmount(50)">50</button>
+                <button type="button" @onclick="() => SetWalletAmount(100)">100</button>
+                <button type="button" @onclick="() => SetWalletAmount(250)">250</button>
+                <button type="button" @onclick="() => SetWalletAmount(500)">500</button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(walletMessage))
+            {
+                <p class="@walletMessageClass">@walletMessage</p>
+            }
+
+            @if (isWalletProcessing)
+            {
+                <div class="btpay-processing">
+                    @if (walletMode == "deposit")
+                    {
+                        <div class="btpay-logo">
+                            <span>BT</span><strong>Pay</strong>
+                        </div>
+
+                        <p>Se procesează plata prin BTPay...</p>
+                    }
+                    else
+                    {
+                        <div class="withdraw-processing-icon">💸</div>
+                        <p>Se procesează retragerea...</p>
+                    }
+                </div>
+            }
+            else
+            {
+                <button type="button" class="wallet-submit" @onclick="ConfirmWalletOperation">
+                    @(walletMode == "deposit" ? "Confirmă depunerea" : "Confirmă retragerea")
+                </button>
+            }
+
+            <div class="transaction-history">
+                <h3>Istoric tranzacții</h3>
+
+                @if (transactionHistory.Count == 0)
+                {
+                    <p class="no-transactions">Nu există tranzacții încă.</p>
+                }
+                else
+                {
+                    <div class="transaction-list">
+                        @foreach (var transaction in transactionHistory)
+                        {
+                            <div class="transaction-item">
+                                <div class="transaction-left">
+                                    <span class="transaction-type @(transaction.Type.ToLower())">
+                                        @(transaction.Type == "Deposit" ? "Depunere" : "Retragere")
+                                    </span>
+
+                                    <small>@transaction.CreatedAt</small>
+                                </div>
+
+                                <div class="transaction-amount @(transaction.Type.ToLower())">
+                                    @(transaction.Type == "Deposit" ? "+" : "-")@transaction.Amount.ToString("F2") RON
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+}
+@if (showSuccessPopup)
+{
+    <div class="success-popup-overlay">
+        <div class="success-popup-window">
+
+            <div class="success-popup-header">
+                <span>EpicSpin</span>
+                <button type="button" @onclick="CloseSuccessPopup">×</button>
+            </div>
+
+            <div class="success-popup-body">
+                <div class="success-check">✓</div>
+
+                <h3>@successPopupTitle</h3>
+                <p>@successPopupMessage</p>
+
+                <button type="button" class="success-ok-btn" @onclick="CloseSuccessPopup">
+                    OK
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
 
 @if (Session.IsLoggedIn)
 {
@@ -59,8 +192,17 @@
                         <span class="up-amount">@Session.CurrentPlayer.Balance.ToString("F2") RON</span>
                     </div>
                     <div class="up-actions">
-                        <button class="up-btn deposit">+ Depune</button>
-                        <button class="up-btn withdraw">Retrage</button>
+                        <button class="up-btn deposit"
+                                @onclick:stopPropagation="true"
+                                @onclick='() => OpenWalletModal("deposit")'>
+                            + Depune
+                        </button>
+
+                        <button class="up-btn withdraw"
+                                @onclick:stopPropagation="true"
+                                @onclick='() => OpenWalletModal("withdraw")'>
+                            Retrage
+                        </button>
                     </div>
                     <div class="up-divider"></div>
                     <a class="up-menu-item" href="#">⚙ Setări cont</a>
@@ -283,6 +425,21 @@
 }
 
 @code {
+    private bool showWalletModal = false;
+private string walletMode = "deposit";
+private double walletAmount = 0;
+private string walletMessage = "";
+private string walletMessageClass = "wallet-message";
+    private bool isWalletProcessing = false;
+    private bool showSuccessPopup = false;
+    private string successPopupTitle = "";
+    private string successPopupMessage = "";
+
+private List<Transaction> transactionHistory = new();
+
+private readonly PlayerRepository PlayerRepo = new();
+private readonly TransactionRepository TransactionRepo = new();
+
     private string activePage   = "casino";
     private string activeGame   = "";
     private bool   showRoulette = false;
@@ -395,6 +552,128 @@ public void Dispose()
         "roulette-black" => "Ruletă — Black", "roulette-green" => "Ruletă — Green",
         _ => g
     };
+    private void OpenWalletModal(string mode)
+{
+    walletMode = mode;
+    walletAmount = 0;
+    walletMessage = "";
+    walletMessageClass = "wallet-message";
+    showPanel = false;
+
+    LoadTransactionHistory();
+
+    showWalletModal = true;
+}
+    private void CloseWalletModal()
+    {
+        if (isWalletProcessing)
+            return;
+
+        showWalletModal = false;
+        walletAmount = 0;
+        walletMessage = "";
+    }
+private void SetWalletAmount(double amount)
+{
+    walletAmount = amount;
+}
+private void LoadTransactionHistory()
+{
+    if (Session.CurrentPlayer == null)
+    {
+        transactionHistory = new List<Transaction>();
+        return;
+    }
+
+    transactionHistory = TransactionRepo
+        .GetByPlayerId(Session.CurrentPlayer.Id)
+        .Take(10)
+        .ToList();
+}
+    private async Task ConfirmWalletOperation()
+    {
+        if (Session.CurrentPlayer == null)
+        {
+            walletMessage = "Nu există un utilizator autentificat.";
+            walletMessageClass = "wallet-message error";
+            return;
+        }
+
+        if (walletAmount <= 0)
+        {
+            walletMessage = "Introdu o sumă validă.";
+            walletMessageClass = "wallet-message error";
+            return;
+        }
+
+        var currentBalance = Session.CurrentPlayer.Balance;
+        double newBalance;
+
+        if (walletMode == "withdraw" && walletAmount > currentBalance)
+        {
+            walletMessage = "Fonduri insuficiente pentru retragere.";
+            walletMessageClass = "wallet-message error";
+            return;
+        }
+
+        walletMessage = "";
+        isWalletProcessing = true;
+
+        await Task.Delay(2000);
+
+        if (walletMode == "deposit")
+        {
+            newBalance = currentBalance + walletAmount;
+
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
+
+            TransactionRepo.Create(new Transaction
+            {
+                PlayerId = Session.CurrentPlayer.Id,
+                Amount = walletAmount,
+                Type = "Deposit",
+                Description = $"Depunere de {walletAmount:F2} RON prin BTPay"
+            });
+
+            Session.UpdateBalance(newBalance);
+
+            successPopupTitle = "Plată realizată cu succes";
+            successPopupMessage = $"Ai depus {walletAmount:F2} RON în contul tău.";
+        }
+        else
+        {
+            newBalance = currentBalance - walletAmount;
+
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
+
+            TransactionRepo.Create(new Transaction
+            {
+                PlayerId = Session.CurrentPlayer.Id,
+                Amount = walletAmount,
+                Type = "Withdraw",
+                Description = $"Retragere de {walletAmount:F2} RON"
+            });
+
+            Session.UpdateBalance(newBalance);
+
+            successPopupTitle = "Retragere realizată cu succes";
+            successPopupMessage = $"Ai retras {walletAmount:F2} RON din contul tău.";
+        }
+
+        walletAmount = 0;
+        isWalletProcessing = false;
+
+        LoadTransactionHistory();
+
+        showWalletModal = false;
+        showSuccessPopup = true;
+    }
+    private void CloseSuccessPopup()
+    {
+        showSuccessPopup = false;
+        successPopupTitle = "";
+        successPopupMessage = "";
+    }
 }
 
 <style>
@@ -663,6 +942,495 @@ public void Dispose()
     .bt-status { font-size:0.68rem; letter-spacing:1.5px; font-weight:700; }
     .bt-status.active { color:#27ae60; }
     .bt-tip    { font-size:0.65rem; color:#444; font-style:italic; }
+
+    .wallet-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.78);
+        backdrop-filter: blur(5px);
+        z-index: 5000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 25px;
+    }
+
+    .wallet-modal {
+        width: 460px;
+        max-height: 90vh;
+        overflow-y: auto;
+        background: #181818;
+        border: 1px solid rgba(212, 175, 55, 0.35);
+        border-radius: 18px;
+        padding: 34px;
+        color: var(--white);
+        position: relative;
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.85);
+        animation: walletDrop 0.18s ease;
+    }
+
+        .wallet-modal::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .wallet-modal::-webkit-scrollbar-thumb {
+            background: rgba(212, 175, 55, 0.35);
+            border-radius: 20px;
+        }
+
+    @@keyframes walletDrop {
+        from {
+            opacity: 0;
+            transform: translateY(-12px) scale(0.98);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .wallet-close {
+        position: absolute;
+        top: 14px;
+        right: 16px;
+        width: 32px;
+        height: 32px;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: #111;
+        color: #888;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 22px;
+        line-height: 1;
+    }
+
+        .wallet-close:hover {
+            color: white;
+            border-color: var(--red);
+        }
+
+    .wallet-icon {
+        width: 58px;
+        height: 58px;
+        border-radius: 16px;
+        background: rgba(212, 175, 55, 0.12);
+        border: 1px solid rgba(212, 175, 55, 0.24);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        margin-bottom: 18px;
+    }
+
+    .wallet-modal h2 {
+        font-family: var(--fh);
+        font-size: 2.1rem;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+        color: var(--white);
+    }
+
+    .wallet-subtitle {
+        font-family: var(--fb);
+        color: #777;
+        font-size: 0.95rem;
+        margin-bottom: 20px;
+    }
+
+    .wallet-balance-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(212,175,55,0.08);
+        border: 1px solid rgba(212,175,55,0.16);
+        border-radius: 10px;
+        padding: 13px 15px;
+        margin-bottom: 20px;
+    }
+
+        .wallet-balance-box span {
+            color: #777;
+            font-family: var(--fb);
+            letter-spacing: 1px;
+        }
+
+        .wallet-balance-box strong {
+            color: var(--gold);
+            font-family: var(--fh);
+            font-size: 1.4rem;
+            letter-spacing: 1px;
+        }
+
+    .wallet-input-group {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 14px;
+    }
+
+        .wallet-input-group label {
+            color: var(--gold);
+            font-family: var(--fb);
+            font-size: 0.75rem;
+            letter-spacing: 3px;
+            margin-bottom: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .wallet-input-group input {
+            height: 54px;
+            background: #0d0d0d;
+            border: 1px solid #333;
+            color: white;
+            border-radius: 10px;
+            padding: 0 16px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+            .wallet-input-group input:focus {
+                border-color: var(--gold);
+                box-shadow: 0 0 12px rgba(212,175,55,0.18);
+            }
+
+    .wallet-quick {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+        .wallet-quick button {
+            height: 38px;
+            border-radius: 8px;
+            border: 1px solid rgba(212,175,55,0.25);
+            background: rgba(212,175,55,0.08);
+            color: var(--gold);
+            cursor: pointer;
+            font-family: var(--fb);
+            font-weight: 700;
+        }
+
+            .wallet-quick button:hover {
+                background: rgba(212,175,55,0.16);
+            }
+
+    .wallet-submit {
+        width: 100%;
+        height: 54px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(90deg, #9b0000, #d10035);
+        color: white;
+        cursor: pointer;
+        font-family: var(--fb);
+        font-weight: 800;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+
+        .wallet-submit:hover {
+            box-shadow: 0 12px 26px rgba(209,0,53,0.28);
+        }
+
+    .wallet-message {
+        text-align: center;
+        margin: 14px 0;
+        font-family: var(--fb);
+        font-weight: 700;
+    }
+
+        .wallet-message.success {
+            color: var(--gold);
+        }
+
+        .wallet-message.error {
+            color: #ff6262;
+        }
+
+    .transaction-history {
+        margin-top: 26px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        padding-top: 20px;
+    }
+
+        .transaction-history h3 {
+            font-family: var(--fh);
+            font-size: 1.4rem;
+            color: var(--white);
+            margin-bottom: 14px;
+            letter-spacing: 1px;
+        }
+
+    .no-transactions {
+        color: #777;
+        font-family: var(--fb);
+        font-size: 0.9rem;
+        text-align: center;
+        padding: 14px 0;
+    }
+
+    .transaction-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 230px;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+
+        .transaction-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .transaction-list::-webkit-scrollbar-thumb {
+            background: rgba(212,175,55,0.35);
+            border-radius: 20px;
+        }
+
+    .transaction-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #101010;
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 10px;
+        padding: 12px 14px;
+    }
+
+    .transaction-left {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .transaction-type {
+        font-family: var(--fb);
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+    }
+
+        .transaction-type.deposit {
+            color: var(--gold);
+        }
+
+        .transaction-type.withdraw {
+            color: #ff6262;
+        }
+
+    .transaction-left small {
+        color: #666;
+        font-size: 0.78rem;
+    }
+
+    .transaction-amount {
+        font-family: var(--fh);
+        font-size: 1.25rem;
+        letter-spacing: 1px;
+    }
+
+        .transaction-amount.deposit {
+            color: var(--gold);
+        }
+
+        .transaction-amount.withdraw {
+            color: #ff6262;
+        }
+
+    @@media (max-width: 600px) {
+        .wallet-modal {
+            width: 100%;
+            padding: 26px;
+        }
+
+        .wallet-quick {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .transaction-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+    }
+    .btpay-processing {
+        margin-top: 16px;
+        padding: 18px;
+        border-radius: 14px;
+        background: rgba(0, 69, 151, 0.12);
+        border: 1px solid rgba(0, 121, 255, 0.35);
+        text-align: center;
+        animation: btpayPulse 1s infinite alternate;
+    }
+
+    .btpay-logo {
+        width: 145px;
+        height: 52px;
+        margin: 0 auto 12px auto;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #004f9e, #0072ce);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Arial, Helvetica, sans-serif;
+        box-shadow: 0 10px 25px rgba(0, 114, 206, 0.35);
+    }
+
+        .btpay-logo span {
+            font-size: 1.6rem;
+            font-weight: 900;
+            margin-right: 3px;
+        }
+
+        .btpay-logo strong {
+            font-size: 1.45rem;
+            font-weight: 700;
+        }
+
+    .btpay-processing p {
+        color: #d9ecff;
+        font-family: var(--fb);
+        font-weight: 700;
+        letter-spacing: 1px;
+        margin: 0;
+    }
+
+    .withdraw-processing-icon {
+        width: 58px;
+        height: 58px;
+        border-radius: 16px;
+        background: rgba(212, 175, 55, 0.12);
+        border: 1px solid rgba(212, 175, 55, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        margin: 0 auto 12px auto;
+    }
+
+    @@keyframes btpayPulse {
+        from {
+            opacity: 0.75;
+            transform: scale(0.99);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    .success-popup-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(3px);
+        z-index: 7000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .success-popup-window {
+        width: 390px;
+        background: #f2f2f2;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 25px 80px rgba(0, 0, 0, 0.75);
+        animation: successPop 0.18s ease;
+        border: 1px solid #303030;
+    }
+
+    .success-popup-header {
+        height: 36px;
+        background: #202020;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 0.9rem;
+    }
+
+        .success-popup-header button {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: transparent;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+            .success-popup-header button:hover {
+                background: #c42b1c;
+            }
+
+    .success-popup-body {
+        padding: 28px 28px 24px 28px;
+        text-align: center;
+        color: #222;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .success-check {
+        width: 58px;
+        height: 58px;
+        margin: 0 auto 16px auto;
+        border-radius: 50%;
+        background: #18a558;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 34px;
+        font-weight: bold;
+    }
+
+    .success-popup-body h3 {
+        margin: 0 0 10px 0;
+        font-size: 1.25rem;
+        color: #111;
+    }
+
+    .success-popup-body p {
+        margin: 0 0 22px 0;
+        color: #555;
+        font-size: 0.95rem;
+    }
+
+    .success-ok-btn {
+        min-width: 100px;
+        height: 36px;
+        border: none;
+        border-radius: 4px;
+        background: #005a9e;
+        color: white;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+        .success-ok-btn:hover {
+            background: #004578;
+        }
+
+    @@keyframes successPop {
+        from {
+            opacity: 0;
+            transform: scale(0.94);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
 </style>
 
 <!-- JavaScript pentru scroll si smooth scroll -->
