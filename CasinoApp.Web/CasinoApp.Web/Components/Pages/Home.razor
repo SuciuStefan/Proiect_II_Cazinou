@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using CasinoApp.DataAccess.DB_operations
 @using CasinoApp.DataAccess.Entities
+@using CasinoApp.Web.Services
 @inject NavigationManager NavManager
 @inject CasinoApp.Web.Services.SessionService Session
 @inject IJSRuntime JS
@@ -279,8 +280,6 @@
                         <button class="up-btn withdraw">Retrage</button>
                     </div>
                     <div class="up-divider"></div>
-                    <a class="up-menu-item" href="#">⚙ Setări cont</a>
-                    <a class="up-menu-item" href="#">📜 Istoric tranzacții</a>
                     <div class="bonus-wrap">
                         <span class="up-menu-item bonus-trigger">🎁 Bonusuri active <span class="bonus-count">1</span></span>
                         <div class="bonus-tooltip">
@@ -349,7 +348,7 @@
             <a class="sb-item @(activeGame=="blackjack"?"active":"")"  @onclick='()=>TrySetGame("blackjack")'><span>🃏</span> BlackJack</a>
             <a class="sb-item @(activeGame=="slots"?"active":"")"      @onclick='()=>TrySetGame("slots")'><span>🎰</span> Slots</a>
             <a class="sb-item @(activeGame=="craps"?"active":"")"      @onclick='()=>TrySetGame("craps")'><span>🎲</span> Craps <small class="ro-tag">Barbut</small></a>
-            <a class="sb-item @(activeGame=="mines"?"active":"")" @onclick='()=>TrySetGame("mines")'><span>💣</span> Mines</a>
+            <a class="sb-item @(activeGame=="mines"?"active":"")"      @onclick='()=>TrySetGame("mines")'><span>💣</span> Mines</a>
             <a class="sb-item @(activeGame=="flipacoin"?"active":"")"  @onclick='()=>TrySetGame("flipacoin")'><span>🪙</span> Flip a Coin</a>
             <a class="sb-item @(activeGame=="wheel"?"active":"")"      @onclick='()=>TrySetGame("wheel")'><span>🎯</span> Roata Norocului</a>
             <a class="sb-item @(activeGame=="scratch"?"active":"")"    @onclick='()=>TrySetGame("scratch")'><span>🎟️</span> Scratch Cards</a>
@@ -365,7 +364,6 @@
                 <div>
                     <div class="promo-tag">CONT NOU</div>
                     <div class="promo-title">100% BONUS<br/>PÂNĂ LA 500 RON</div>
-                    <button class="promo-btn">PROFITĂ ACUM</button>
                 </div>
                 <div class="promo-deco">🎰</div>
             </div>
@@ -426,10 +424,10 @@
 
 @code {
     private bool showWalletModal = false;
-private string walletMode = "deposit";
-private double walletAmount = 0;
-private string walletMessage = "";
-private string walletMessageClass = "wallet-message";
+    private string walletMode = "deposit";
+    private double walletAmount = 0;
+    private string walletMessage = "";
+    private string walletMessageClass = "wallet-message";
     private bool isWalletProcessing = false;
     private bool showSuccessPopup = false;
     private string successPopupTitle = "";
@@ -564,6 +562,8 @@ private async Task Logout()
 
     private void ToggleUserPanel() => showPanel = !showPanel;
 
+
+
     private string GetGameTitle(string g) => g switch
     {
         "blackjack"      => "BlackJack",      "slots"          => "Slots",
@@ -633,6 +633,18 @@ private void LoadTransactionHistory()
         if (walletMode == "withdraw" && walletAmount > currentBalance)
         {
             walletMessage = "Fonduri insuficiente pentru retragere.";
+            walletMessageClass = "wallet-message error";
+            return;
+        }
+
+        // Validare cap balanță la depozit — afișează eroare în loc să taie silențios
+        if (walletMode == "deposit" && currentBalance + walletAmount > SessionService.MaxBalance)
+        {
+            double spaceLeft = SessionService.MaxBalance - currentBalance;
+            if (spaceLeft <= 0)
+                walletMessage = "Ai atins limita maximă de balanță (9.999.999.999 RON).";
+            else
+                walletMessage = $"Depunerea depășește limita maximă. Poți depune cel mult {spaceLeft:N2} RON.";
             walletMessageClass = "wallet-message error";
             return;
         }
