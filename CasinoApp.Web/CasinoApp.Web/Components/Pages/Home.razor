@@ -6,6 +6,8 @@
 @inject NavigationManager NavManager
 @inject CasinoApp.Web.Services.SessionService Session
 @inject IJSRuntime JS
+@inject Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage.ProtectedLocalStorage Storage
+@inject CasinoApp.DataAccess.DB_operations.PlayerRepository PlayerRepo
 
 <PageTitle>Epic Spin – Casino</PageTitle>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -205,8 +207,6 @@
                         </button>
                     </div>
                     <div class="up-divider"></div>
-                    <a class="up-menu-item" href="#">⚙ Setări cont</a>
-                    <a class="up-menu-item" href="#">📜 Istoric tranzacții</a>
                     <div class="bonus-wrap">
                         <span class="up-menu-item bonus-trigger">🎁 Bonusuri active <span class="bonus-count">1</span></span>
                         <div class="bonus-tooltip">
@@ -437,7 +437,6 @@ private string walletMessageClass = "wallet-message";
 
 private List<Transaction> transactionHistory = new();
 
-private readonly PlayerRepository PlayerRepo = new();
 private readonly TransactionRepository TransactionRepo = new();
 
     private string activePage   = "casino";
@@ -465,19 +464,48 @@ public void Dispose()
     Session.OnChange -= RefreshBalance;
 }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (!firstRender) return;
+
+    if (!Session.IsLoggedIn)
     {
-        if (firstRender)
+        try
         {
-            if (!Session.IsLoggedIn)
+            var result = await Storage.GetAsync<int>("playerId");
+
+            if (result.Success)
             {
-                NavManager.NavigateTo("/");
-                return;
+                var player = PlayerRepo.GetById(result.Value);
+                if (player != null)
+                {
+                    Session.SetPlayer(player);
+                    await InvokeAsync(StateHasChanged);
+                    await JS.InvokeVoidAsync("initScrollWatcher", DotNetObjectReference.Create(this));
+                    return;
+                }
             }
-            // Inregistreaza listener de scroll care apeleaza C# din JS
-            await JS.InvokeVoidAsync("initScrollWatcher", DotNetObjectReference.Create(this));
         }
+        catch
+        {
+            // Storage expirat sau corupt — cade la login
+        }
+
+        NavManager.NavigateTo("/");
+        return;
     }
+
+    await JS.InvokeVoidAsync("initScrollWatcher", DotNetObjectReference.Create(this));
+}
+
+// Înlocuiește metoda Logout existentă
+private async Task Logout()
+{
+    await Storage.DeleteAsync("playerId");
+    Session.Clear();
+    showPanel = false;
+    NavManager.NavigateTo("/");
+}
 
     // Apelat din JavaScript la scroll
     [JSInvokable]
@@ -535,13 +563,6 @@ public void Dispose()
     }
 
     private void ToggleUserPanel() => showPanel = !showPanel;
-
-    private void Logout()
-    {
-        Session.Clear();
-        showPanel = false;
-        NavManager.NavigateTo("/");
-    }
 
     private string GetGameTitle(string g) => g switch
     {

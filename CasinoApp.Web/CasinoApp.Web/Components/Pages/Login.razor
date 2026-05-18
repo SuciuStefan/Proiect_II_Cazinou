@@ -5,7 +5,7 @@
 @using CasinoApp.DataAccess.DB_operations
 @inject PlayerRepository PlayerRepo
 @inject CasinoApp.Web.Services.SessionService Session
-
+@inject Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage.ProtectedLocalStorage Storage
 
 <PageTitle>CasinoApp – Intră în Joc</PageTitle>
 
@@ -62,18 +62,15 @@
                 <div class="field-group">
                     <label>Utilizator</label>
                     <!--Marcus-->
-                    <input type="text" @bind="loginUsername" maxlength="18" placeholder="Utilizatorul tău..." />
+                    <input type="text" @bind="loginUsername" @bind:event="oninput" @onkeydown="HandleLoginKeyDown" maxlength="18" placeholder="Utilizatorul tău..." />
                 </div>
                 <div class="field-group">
                     <label>Parolă</label>
                     <!--Marcus-->
-                    <input type="password" @bind="loginPassword" maxlength="18" placeholder="••••••••" />
+                    <input type="password" @bind="loginPassword" @bind:event="oninput" @onkeydown="HandleLoginKeyDown" maxlength="18" placeholder="••••••••" />
                 </div>
 
-                <a class="forgot-link"
-   @onclick="GoToForgotPassword">
-   Ai uitat parola?
-</a>
+                <a class="forgot-link" @onclick="GoToForgotPassword"> Ai uitat parola? </a>
 
                 @if (!string.IsNullOrEmpty(loginMessage))
                 {
@@ -127,30 +124,41 @@
     private void SwitchToSignUp() { isSignUp = true;  loginMessage = ""; }
     private void SwitchToLogin()  { isSignUp = false; regMessage   = ""; }
 
-    private void HandleLogin()
+    private async Task HandleLoginKeyDown(KeyboardEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
-        {
-            loginSuccess = false;
-            loginMessage = "Completează toate câmpurile!";
-            return;
-        }
-
-        var player = PlayerRepo.GetByUsername(loginUsername);
-
-        if (player != null && player.Password == loginPassword)
-        {
-            Session.SetPlayer(player); // ← SALVEAZA playerul in "cutie"
-            loginSuccess = true;
-            loginMessage = "Autentificare reușită!";
-            NavManager.NavigateTo("/Home");
-        }
-        else
-        {
-            loginSuccess = false;
-            loginMessage = "Utilizator sau parolă greșite.";
-        }
+        if (e.Key == "Enter") await HandleLogin();
     }
+
+    private void HandleRegisterKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") HandleRegister();
+    }
+
+    private async Task HandleLogin()
+{
+    if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
+    {
+        loginSuccess = false;
+        loginMessage = "Completează toate câmpurile!";
+        return;
+    }
+
+    var player = PlayerRepo.GetByUsername(loginUsername);
+
+    if (player != null && player.Password == loginPassword)
+    {
+        Session.SetPlayer(player);
+        await Storage.SetAsync("playerId", player.Id); //salveaza ID-ul criptat
+        loginSuccess = true;
+        loginMessage = "Autentificare reușită!";
+        NavManager.NavigateTo("/Home");
+    }
+    else
+    {
+        loginSuccess = false;
+        loginMessage = "Utilizator sau parolă greșite.";
+    }
+}
 
     private void HandleRegister()
     {

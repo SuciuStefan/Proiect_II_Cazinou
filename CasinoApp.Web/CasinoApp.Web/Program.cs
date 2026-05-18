@@ -14,9 +14,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 
-
-
-
+builder.Services.AddScoped<PlayerRepository>();
 var app = builder.Build();
 DatabaseInitializer.Initialize();
 
