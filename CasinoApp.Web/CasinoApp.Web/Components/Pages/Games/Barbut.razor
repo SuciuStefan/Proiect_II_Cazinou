@@ -144,25 +144,25 @@
 
             @* Chips *@
             <div class="bb-info-box">
-                <span class="bb-lbl">JETON ACTIV</span>
+                <span class="bb-lbl">APASĂ PE JETON PENTRU PARIERE</span>
                 <div class="bb-chips-row">
                     @foreach (var cv in chipDenoms)
                     {
                         int c = cv;
                         <button class="bb-chip chip-@c @(selectedChip == c ? "chip-sel" : "")"
-                                @onclick="() => selectedChip = c">@c</button>
+                                @onclick="() => HandleChipClick(c)"
+                                disabled="@isRolling">
+                            @c
+                        </button>
                     }
                 </div>
             </div>
 
-            @* Actiuni pariu *@
+            @* Actiuni pariu — S-a sters butonul de adauga, ramane doar clear *@
             <div class="bb-bet-actions">
-                <button class="bb-add-btn" @onclick="AddToBet" disabled="@isRolling">
-                    + ADAUGĂ
-                </button>
                 <button class="bb-clear-btn" @onclick="ClearBet"
                         disabled="@(isRolling || betAmount == 0)">
-                    ✕ ȘTERGE
+                    ✕ ȘTERGE PARIUL
                 </button>
             </div>
 
@@ -236,14 +236,13 @@
 
 </div>
 
-@* ── JAVASCRIPT — acelasi pattern ca Slots ── *@
+@* ── JAVASCRIPT — neschimbat ── *@
 <script>
 window.barbutGame = (function () {
 
     var dotnet    = null;
     var intervals = {};   // id -> intervalId
 
-    // Dots HTML pentru fiecare fata a zarului — aceleasi clase CSS ca Blazor
     var dotHTML = {
         1: "<span class='dot dot-mc'></span>",
         2: "<span class='dot dot-tr'></span><span class='dot dot-bl'></span>",
@@ -257,12 +256,7 @@ window.barbutGame = (function () {
         dotnet = ref;
     }
 
-    // diceCount  = nr zaruri (1-4)
-    // playerVals = [v0, v1, ...]               valorile finale ale jucatorului
-    // aiVals     = [[v0,...],[v0,...],[v0,...]] valorile finale ai-uri
     function roll(diceCount, playerVals, aiVals) {
-
-        // ── 1. Porneste TOATE zarurile ───────────────────────────
         for (var ai = 0; ai < 3; ai++) {
             for (var d = 0; d < diceCount; d++) {
                 startSpin('die-ai-' + ai + '-' + d);
@@ -272,7 +266,6 @@ window.barbutGame = (function () {
             startSpin('die-p-' + p);
         }
 
-        // ── 2. Opreste AI-urile stagnat (ca reelurile la Slots) ──
         var aiStops = [900, 1400, 1900];
 
         for (var ai2 = 0; ai2 < 3; ai2++) {
@@ -289,7 +282,6 @@ window.barbutGame = (function () {
             })(ai2);
         }
 
-        // ── 3. Jucatorul se opreste ultimul (dramatic) ───────────
         var playerStopBase = 2500;
         for (var p2 = 0; p2 < diceCount; p2++) {
             (function(pIdx) {
@@ -299,7 +291,6 @@ window.barbutGame = (function () {
             })(p2);
         }
 
-        // ── 4. Callback Blazor dupa ce totul s-a oprit ───────────
         var totalMs = playerStopBase + (diceCount - 1) * 130 + 500;
         setTimeout(function() {
             if (dotnet) dotnet.invokeMethodAsync('OnRollComplete');
@@ -311,7 +302,6 @@ window.barbutGame = (function () {
         if (!el) return;
         el.classList.add('die-spinning');
 
-        // Cicleaza prin dots HTML reale, rapid cu blur — exact ca simbolurile la Slots
         intervals[id] = setInterval(function() {
             el.innerHTML = dotHTML[Math.floor(Math.random() * 6) + 1];
         }, 40);
@@ -324,9 +314,7 @@ window.barbutGame = (function () {
         var el = document.getElementById(id);
         if (!el) return;
 
-        // Seteaza fata finala cu dots reale
         el.innerHTML = dotHTML[finalVal];
-
         el.classList.remove('die-spinning');
         el.classList.add('die-stopping');
 
@@ -341,7 +329,6 @@ window.barbutGame = (function () {
 
 @code {
 
-    // ── Pool 30 de nume romanesti ───────────────────────────────
     private static readonly string[] namePool =
     {
         "Andrei", "Mihai", "Ion", "Alexandru", "Bogdan",
@@ -358,11 +345,9 @@ window.barbutGame = (function () {
         "🤡", "😤", "🫡", "🥷", "🤯", "😏", "💀"
     };
 
-    // ── AI Config (aleator la fiecare instantiere) ──────────────
     private string[] aiNames   = new string[3];
     private string[] aiAvatars = new string[3];
 
-    // ── State ──────────────────────────────────────────────────
     private int    diceCount    = 2;
     private int    selectedChip = 5;
     private int    betAmount    = 0;
@@ -370,26 +355,18 @@ window.barbutGame = (function () {
     private bool   showResult   = false;
     private string errorMsg     = "";
 
-    // ── Dice Values ────────────────────────────────────────────
-    private int[]   playerDice = Array.Empty<int>();
+    private int[]    playerDice = Array.Empty<int>();
     private int[][] aiDice     = { Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>() };
 
-    // ── Results ────────────────────────────────────────────────
     private int    playerSum = 0;
     private int[]  aiSums    = new int[3];
-    private double netGain   = 0;
+    private double netGain    = 0;
     private int    beatCount = 0;
 
-    // ── History (0=lose, 1=push, 2/3=win) ──────────────────────
     private List<int> history = new();
-
-    // ── Chips ──────────────────────────────────────────────────
     private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
-
-    // ── JS Interop ─────────────────────────────────────────────
     private DotNetObjectReference<Barbut>? dotnetRef;
 
-    // ── Lifecycle ──────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += Refresh;
@@ -420,18 +397,24 @@ window.barbutGame = (function () {
         dotnetRef?.Dispose();
     }
 
-    // ── Bet Actions ────────────────────────────────────────────
-    private void AddToBet()
+    @* ── Logica noua la apasarea jetonului ── *@
+    private void HandleChipClick(int chipValue)
     {
         if (isRolling) return;
-        if (Session.CurrentPlayer!.Balance < betAmount + selectedChip)
+
+        // Selectează vizual jetonul
+        selectedChip = chipValue;
+
+        // Verifică dacă utilizatorul are suficienți bani pentru a adăuga valoarea jetonului
+        if (Session.CurrentPlayer!.Balance < betAmount + chipValue)
         {
             errorMsg = "Balanță insuficientă!";
             return;
         }
+
         errorMsg   = "";
         showResult = false;
-        betAmount += selectedChip;
+        betAmount += chipValue; // Adaugă direct la bet
     }
 
     private void ClearBet()
@@ -441,7 +424,6 @@ window.barbutGame = (function () {
         errorMsg   = "";
     }
 
-    // ── Roll ───────────────────────────────────────────────────
     private async Task Roll()
     {
         if (isRolling || betAmount == 0) return;
@@ -451,7 +433,6 @@ window.barbutGame = (function () {
             return;
         }
 
-        // 1. Deduce pariul
         var balAfterBet = Session.CurrentPlayer.Balance - betAmount;
         Session.UpdateBalance(balAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
@@ -462,7 +443,6 @@ window.barbutGame = (function () {
         netGain    = 0;
         beatCount  = 0;
 
-        // 2. Genereaza rezultatele inainte sa porneasca animatia
         var rng    = new Random();
         playerDice = Enumerable.Range(0, diceCount).Select(_ => rng.Next(1, 7)).ToArray();
         for (int i = 0; i < 3; i++)
@@ -482,23 +462,17 @@ window.barbutGame = (function () {
         };
         netGain = returns - betAmount;
 
-        // 3. Blazor randeaza zarurile cu <span class="die-face"> (JS le va anima)
         StateHasChanged();
 
-        // 4. Porneste animatia JS — ii dam rezultatele reale
         await JS.InvokeVoidAsync("barbutGame.roll",
             diceCount,
             playerDice,
             new[] { aiDice[0], aiDice[1], aiDice[2] });
-
-        // JS apeleaza OnRollComplete() singur cand termina
     }
 
-    // ── Callback de la JS ──────────────────────────────────────
     [JSInvokable]
     public async Task OnRollComplete()
     {
-        // Acorda castigul daca exista
         double returns = netGain + betAmount;
         if (returns > 0)
         {
@@ -516,7 +490,6 @@ window.barbutGame = (function () {
         await InvokeAsync(StateHasChanged);
     }
 
-    // ── CSS Helpers ────────────────────────────────────────────
     private string GetPlayerCardClass()
     {
         if (beatCount == 3) return "card-winner";
@@ -544,7 +517,6 @@ window.barbutGame = (function () {
         playerSum < aiSums[idx] ? "ȘI-A BĂT JUCĂTORUL" :
         playerSum > aiSums[idx] ? "BĂTUT DE JUCĂTOR" : "EGALITATE";
 
-    // ── Die Dots HTML ──────────────────────────────────────────
     private string BuildDieDots(int value)
     {
         var dots = value switch
@@ -705,7 +677,7 @@ window.barbutGame = (function () {
     }
     .bb-die-sm { width: 38px; height: 38px; border-radius: 7px; }
 
-    /* ── DOTS (apar in animatie si dupa) ── */
+    /* ── DOTS ── */
     .dot {
         position: absolute;
         width: 11px; height: 11px;
@@ -725,11 +697,9 @@ window.barbutGame = (function () {
     /* ── IDLE ── */
     .die-idle { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: rgba(26,8,8,0.3); }
     .bb-die-sm .die-idle { font-size: 0.85rem; }
-    .bb-die:has(.die-idle) .dot {
-    display: none !important;
-}
+    .bb-die:has(.die-idle) .dot { display: none !important; }
 
-    /* ── SPINNING — blur static pe clasa + shake animation separat (exact ca Slots) ── */
+    /* ── SPINNING ── */
     .die-spinning {
         filter: blur(3px);
         animation: dieShake 0.06s steps(1) infinite;
@@ -745,10 +715,8 @@ window.barbutGame = (function () {
         100% { transform: translateY(0); }
     }
 
-    /* ── STOPPING — bounce la oprire ── */
-    .die-stopping {
-        animation: dieStop 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.1);
-    }
+    /* ── STOPPING ── */
+    .die-stopping { animation: dieStop 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.1); }
     @@keyframes dieStop {
         0%   { transform: translateY(-16px); filter: blur(2px); }
         60%  { transform: translateY(5px);   filter: blur(0); }
@@ -756,7 +724,7 @@ window.barbutGame = (function () {
         100% { transform: translateY(0);     filter: blur(0); }
     }
 
-    /* ── REVEAL POP (Blazor redare dupa animatie) ── */
+    /* ── REVEAL POP ── */
     @@keyframes diePop {
         0%   { transform: scale(0.4); opacity: 0; }
         65%  { transform: scale(1.15); opacity: 1; }
@@ -773,7 +741,7 @@ window.barbutGame = (function () {
         flex: 1; min-width: 200px; max-width: 280px;
     }
     .bb-info-box { display: flex; flex-direction: column; gap: 6px; }
-    .bb-lbl { font-size: 0.62rem; letter-spacing: 3px; color: #444; font-weight: 700; }
+    .bb-lbl { font-size: 0.62rem; letter-spacing: 3px; color: #666; font-weight: 700; }
     .bb-balance-val {
         font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem;
         color: #D4AF37; letter-spacing: 2px;
@@ -814,7 +782,8 @@ window.barbutGame = (function () {
         content: ''; position: absolute; inset: 3px;
         border-radius: 50%; border: 1px dashed rgba(255,255,255,0.3);
     }
-    .bb-chip:hover { transform: scale(1.1); }
+    .bb-chip:hover:not(:disabled) { transform: scale(1.1); }
+    .bb-chip:disabled { opacity: 0.4; cursor: not-allowed; }
     .chip-sel { transform: scale(1.18) !important; outline: 2px solid #D4AF37; box-shadow: 0 0 14px rgba(212,175,55,0.7); }
     .chip-1   { background: linear-gradient(160deg,#bbb,#888); }
     .chip-5   { background: linear-gradient(160deg,#e74c3c,#c0392b); }
@@ -825,24 +794,15 @@ window.barbutGame = (function () {
 
     /* ── BET ACTIONS ── */
     .bb-bet-actions { display: flex; gap: 6px; }
-    .bb-add-btn {
-        flex: 2; padding: 9px 10px;
-        background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.3);
-        border-radius: 5px; font-family: 'Rajdhani', sans-serif; font-size: 0.78rem;
-        font-weight: 700; letter-spacing: 1.5px; color: #D4AF37;
-        cursor: pointer; transition: all 0.15s;
-    }
-    .bb-add-btn:hover:not(:disabled) { background: rgba(212,175,55,0.18); box-shadow: 0 0 10px rgba(212,175,55,0.2); }
-    .bb-add-btn:disabled { opacity: 0.3; cursor: not-allowed; }
     .bb-clear-btn {
-        flex: 1; padding: 9px 10px; background: transparent;
-        border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;
+        flex: 1; padding: 9px 10px; background: rgba(231,76,60,0.05);
+        border: 1px solid rgba(231,76,60,0.2); border-radius: 5px;
         font-family: 'Rajdhani', sans-serif; font-size: 0.78rem;
-        font-weight: 700; letter-spacing: 1.5px; color: #555;
+        font-weight: 700; letter-spacing: 1.5px; color: #e74c3c;
         cursor: pointer; transition: all 0.15s;
     }
-    .bb-clear-btn:hover:not(:disabled) { border-color: rgba(231,76,60,0.5); color: #e74c3c; }
-    .bb-clear-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+    .bb-clear-btn:hover:not(:disabled) { background: rgba(231,76,60,0.15); border-color: rgba(231,76,60,0.5); }
+    .bb-clear-btn:disabled { opacity: 0.25; cursor: not-allowed; background: transparent; border-color: rgba(255,255,255,0.08); color: #555; }
 
     /* ── WIN BOX ── */
     .bb-win-box {
@@ -896,7 +856,7 @@ window.barbutGame = (function () {
         font-family: 'Bebas Neue', sans-serif; font-size: 0.75rem;
         border: 1px solid rgba(255,255,255,0.08);
     }
-    .hn-win  { background: #163c16; color: #2ecc71; }
+    .hn-win   { background: #163c16; color: #2ecc71; }
     .hn-push { background: #2c2208; color: #D4AF37; }
     .hn-lose { background: #3c1616; color: #e74c3c; }
 

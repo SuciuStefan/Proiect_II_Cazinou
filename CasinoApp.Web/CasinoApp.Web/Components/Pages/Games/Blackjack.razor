@@ -656,8 +656,8 @@
 
         // ── Rezultat mana principala ──
         (resultMsg, resultWin, newBalance) = ComputeHandResult(
-            pv, dv, playerBJ, dealerBJ, currentBet, newBalance
-        );
+    pv, dv, playerBJ, dealerBJ, currentBet, newBalance, insuranceBet
+);
 
         // ── Rezultat mana split (daca exista) ──
         if (hasSplit)
@@ -690,7 +690,7 @@
     /// Returneaza mesajul, castigul net si noua balanta acumulata.
     /// </summary>
     private static (string msg, decimal win, decimal newBalance) ComputeHandResult(
-        int pv, int dv, bool playerBJ, bool dealerBJ, decimal bet, decimal balance)
+    int pv, int dv, bool playerBJ, bool dealerBJ, decimal bet, decimal balance, decimal insuranceBet = 0)
     {
         string  msg;
         decimal win;
@@ -703,11 +703,18 @@
             win = -bet;
         }
         else if (dealerBJ && !playerBJ)
+{
+        if (insuranceBet > 0)
         {
-            // Dealer Blackjack, jucatorul nu are — pierde pariul
+            msg = "ASIGURAREA TE-A SALVAT!";
+            win = 0; // pierzi pariul dar castigi insurance — net zero
+        }
+        else
+        {
             msg = "DEALER BLACKJACK";
             win = -bet;
         }
+}
         else if (playerBJ && !dealerBJ)
         {
             // Blackjack! Plateste 3:2
@@ -823,12 +830,13 @@
 
     // Acum primeste mesajul ca parametru — poate fi refolosit pentru split
     private string GetResultClass(string msg) => msg switch
-    {
-        var m when m.Contains("BLACKJACK") && m.Contains("✦") => "res-bj",
-        var m when m.Contains("CASTIGAT")                     => "res-win",
-        var m when m.Contains("EGALITATE")                    => "res-push",
-        _                                                      => "res-lose"
-    };
+{
+    var m when m.Contains("BLACKJACK") && m.Contains("✦") => "res-bj",
+    var m when m.Contains("ASIGURAREA")                   => "res-push",  // ← add this
+    var m when m.Contains("CASTIGAT")                     => "res-win",
+    var m when m.Contains("EGALITATE")                    => "res-push",
+    _                                                      => "res-lose"
+};
 
     // Multi-column chip stack
     private List<List<int>> GetChipColumns(int amount)
@@ -933,8 +941,8 @@
     .bj-sidebar {
         position: absolute;
         right: 20px;
-        top: 50%;
-        transform: translateY(-50%);
+        top: 100px;
+        transform: none;
         display: flex;
         flex-direction: column;
         align-items: flex-end;
