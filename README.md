@@ -2,7 +2,7 @@
 
 Aplicație web de tip cazinou online dezvoltată în cadrul disciplinei Ingineria Programării. Proiectul implementează o arhitectură decuplată pe straturi (N-Layer) folosind tehnologii din ecosistemul .NET.
 
-## 🛠️ Stack Tehnologic
+##  Stack Tehnologic
 
 * **Backend:** .NET 10 / ASP.NET Core Web API
 * **Frontend:** Blazor Server (mod de interactivitate: `InteractiveServer`)
@@ -10,7 +10,7 @@ Aplicație web de tip cazinou online dezvoltată în cadrul disciplinei Ingineri
 * **Acces la date:** ADO.NET (interogări SQL native) + Repository Pattern
 * **Stilizare:** CSS3 Custom (Fonturi: Bebas Neue, Rajdhani)
 
-## 🏗️ Structura Soluției
+##  Structura Soluției
 
 Proiectul este împărțit în 5 straturi pentru a asigura separarea responsabilităților:
 
@@ -20,7 +20,7 @@ Proiectul este împărțit în 5 straturi pentru a asigura separarea responsabil
 * **CasinoApp.Web:** Serverul Blazor principal care gestionează layout-ul și paginile aplicației.
 * **CasinoApp.Web.Client:** Componentele interactive randate pe partea de client.
 
-## 🚀 Instalare și Rulare Locală
+##  Instalare și Rulare Locală
 
 Pentru ca aplicația să funcționeze corect, este necesară pornirea simultană a API-ului și a serverului Web.
 
