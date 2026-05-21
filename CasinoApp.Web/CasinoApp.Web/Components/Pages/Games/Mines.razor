@@ -40,8 +40,8 @@
                 <div class="mn-slider-row">
                     <span class="mn-slider-min">1</span>
                     <input type="range" class="mn-slider" min="1" max="@MaxMines"
-                           value="@mineCount"
-                           @oninput="OnMineSlider" />
+                           @bind="mineCount" @bind:event="oninput"
+                           style="--val: @(((double)(mineCount - 1) / Math.Max(MaxMines - 1, 1) * 100).ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%" />
                     <span class="mn-slider-max">@MaxMines</span>
                 </div>
                 <div class="mn-mine-info">
@@ -257,6 +257,7 @@
     // ── Config ────────────────────────────────────────────────────────────
     private static readonly int[] GridSizes  = { 25, 36, 49, 64 };
     private static readonly int[] ChipDenoms = { 1, 5, 10, 25, 50, 100 };
+    private const decimal MaxBet = 1_000_000m;
 
     // ── Stare joc ─────────────────────────────────────────────────────────
     private GameState  gameState    = GameState.Idle;
@@ -306,28 +307,24 @@
         mineCount = Math.Min(mineCount, MaxMines);
     }
 
-    private void OnMineSlider(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int v))
-            mineCount = Math.Clamp(v, 1, MaxMines);
-    }
-
     // ── Jetoane ───────────────────────────────────────────────────────────
     private void AddChip(int v)
     {
-        if (Session.CurrentPlayer!.Balance < (double)(currentBet + v))
+        decimal newBet = Math.Min(currentBet + v, MaxBet);
+        if (Session.CurrentPlayer!.Balance < (double)newBet)
         { errorMsg = "Balanta insuficienta!"; return; }
         errorMsg = "";
-        currentBet += v;
+        currentBet = newBet;
     }
 
     private void ClearBet()  { currentBet = 0; errorMsg = ""; }
-    private void HalfBet()   { currentBet = Math.Max(1, Math.Floor(currentBet / 2)); }
+    private void HalfBet()   { currentBet = Math.Max(1, Math.Floor(currentBet / 2)); errorMsg = ""; }
     private void DoubleBet()
     {
-        decimal doubled = currentBet * 2;
+        decimal doubled = Math.Min(currentBet * 2, MaxBet);
         if (Session.CurrentPlayer!.Balance < (double)doubled)
         { errorMsg = "Balanta insuficienta pentru dublare!"; return; }
+        errorMsg = "";
         currentBet = doubled;
     }
     private void Rebet()
@@ -565,7 +562,7 @@
         min-height:36px; padding:0 10px;
         background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.07); border-radius:6px;
     }
-    .mn-bet-val         { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#D4AF37; flex:1; }
+    .mn-bet-val         { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#D4AF37; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .mn-bet-placeholder { font-size:0.75rem; color:#333; flex:1; }
     .mn-bet-half, .mn-bet-dbl {
         padding:3px 8px; border-radius:4px; border:none; cursor:pointer;

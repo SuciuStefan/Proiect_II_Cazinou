@@ -1,10 +1,13 @@
-﻿using CasinoApp.DataAccess.Entities;
+using CasinoApp.DataAccess.Entities;
 using Microsoft.Data.Sqlite;
 
 namespace CasinoApp.DataAccess.DB_operations
 {
     public class PlayerRepository
     {
+        // Acelaşi cap ca în SessionService — dublu enforced la nivel de DB
+        private const double MaxBalance = 9_999_999_999.0;
+
         public List<Player> GetAll()
         {
             var players = new List<Player>();
@@ -165,6 +168,7 @@ namespace CasinoApp.DataAccess.DB_operations
 
             command.ExecuteNonQuery();
         }
+
         public void UpdatePassword(int playerId, string newPassword)
         {
             using var connection = DbManager.GetConnection();
@@ -172,10 +176,10 @@ namespace CasinoApp.DataAccess.DB_operations
 
             var command = connection.CreateCommand();
             command.CommandText = @"
-        UPDATE Players
-        SET Password = $password
-        WHERE Id = $playerId;
-    ";
+                UPDATE Players
+                SET Password = $password
+                WHERE Id = $playerId;
+            ";
 
             command.Parameters.AddWithValue("$password", newPassword);
             command.Parameters.AddWithValue("$playerId", playerId);
@@ -185,6 +189,9 @@ namespace CasinoApp.DataAccess.DB_operations
 
         public void UpdateBalance(int playerId, double newBalance)
         {
+            // Cap enforced la nivel de DB — nicio componentă nu poate scrie peste limită
+            double clampedBalance = Math.Min(newBalance, MaxBalance);
+
             using var connection = DbManager.GetConnection();
             connection.Open();
 
@@ -195,7 +202,7 @@ namespace CasinoApp.DataAccess.DB_operations
                 WHERE Id = $playerId;
             ";
 
-            command.Parameters.AddWithValue("$balance", newBalance);
+            command.Parameters.AddWithValue("$balance", clampedBalance);
             command.Parameters.AddWithValue("$playerId", playerId);
 
             command.ExecuteNonQuery();
