@@ -1,6 +1,15 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 @inject NavigationManager NavManager
+<<<<<<< Updated upstream
+=======
+@using CasinoApp.DataAccess.Entities
+@using CasinoApp.DataAccess.DB_operations
+@using CasinoApp.BusinessLogic.Accounts
+@inject PlayerRepository PlayerRepo
+@inject CasinoApp.Web.Services.SessionService Session
+@inject Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage.ProtectedLocalStorage Storage
+>>>>>>> Stashed changes
 
 <PageTitle>CasinoApp – Intră în Joc</PageTitle>
 
@@ -126,7 +135,13 @@
         regMessage = "";
     }
 
+<<<<<<< Updated upstream
     private void HandleLogin()
+=======
+    private async Task HandleLogin()
+{
+    if (AccountRules.ValidateLogin(loginUsername, loginPassword) == LoginValidation.MissingFields)
+>>>>>>> Stashed changes
     {
         // TODO: înlocuiește cu apel real la API când backend-ul e gata
         if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
@@ -151,6 +166,7 @@
 
     private void HandleRegister()
     {
+<<<<<<< Updated upstream
         // TODO: înlocuiește cu apel real la API când backend-ul e gata
         if (string.IsNullOrWhiteSpace(regUsername) || string.IsNullOrWhiteSpace(regEmail) || string.IsNullOrWhiteSpace(regPassword))
         {
@@ -163,6 +179,19 @@
         {
             regSuccess = false;
             regMessage = "Parola trebuie să aibă minim 6 caractere.";
+=======
+        var validation = AccountRules.ValidateRegistration(regUsername, regEmail, regPassword);
+        if (validation != RegistrationValidation.Valid)
+        {
+            regSuccess = false;
+            regMessage = validation switch
+            {
+                RegistrationValidation.UsernameTooLong => "Username-ul poate avea maxim 18 caractere.",
+                RegistrationValidation.PasswordTooShort => "Parola trebuie să aibă minim 6 caractere.",
+                RegistrationValidation.PasswordTooLong => "Parola poate avea maxim 18 caractere.",
+                _ => "Completează toate câmpurile!"
+            };
+>>>>>>> Stashed changes
             return;
         }
 
