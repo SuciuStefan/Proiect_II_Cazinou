@@ -7,24 +7,9 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
 
-<<<<<<< Updated upstream
   <ItemGroup>
     <ProjectReference Include="..\CasinoApp.Web.Client\CasinoApp.Web.Client.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.6" />
   </ItemGroup>
-=======
-	<ItemGroup>
-		<ProjectReference Include="..\CasinoApp.Web.Client\CasinoApp.Web.Client.csproj" />
-		<ProjectReference Include="..\..\CasinoApp.BusinessLogic\CasinoApp.BusinessLogic.csproj" />
-		<ProjectReference Include="..\..\CasinoApp.DataAccess\CasinoApp.DataAccess.csproj" />
-		<PackageReference Include="MailKit" Version="4.16.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.6" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Components\Pages\Games\" />
-	  <Folder Include="wwwroot\images\" />
-	</ItemGroup>
->>>>>>> Stashed changes
 
 </Project>
