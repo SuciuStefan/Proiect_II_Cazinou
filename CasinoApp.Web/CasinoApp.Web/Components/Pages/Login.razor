@@ -168,6 +168,16 @@
             regMessage = "Completează toate câmpurile!";
             return;
         }
+        regEmail = regEmail.Trim();
+
+        if (!regEmail.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase) ||
+            regEmail.Length <= "@gmail.com".Length)
+        {
+            regSuccess = false;
+            regMessage = "Pentru crearea contului este permisă doar o adresă Gmail validă.";
+            return;
+        }
+
         //Marcus
         if (regUsername.Length > 18)
         {
