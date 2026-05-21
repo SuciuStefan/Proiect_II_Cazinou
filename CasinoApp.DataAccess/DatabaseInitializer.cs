@@ -118,12 +118,16 @@ namespace CasinoApp.DataAccess
             using var command = connection.CreateCommand();
 
             command.CommandText = @"
-                INSERT OR IGNORE INTO Games (Name, Type, MinBet, MaxBet, IsActive) VALUES
-                ('Slots Classic', 'Slots', 1, 500, 1),
-                ('Blackjack', 'Cards', 5, 1000, 1),
-                ('Roulette', 'Table', 2, 750, 1),
-                ('Poker Video', 'Poker', 1, 300, 1);
-            ";
+        INSERT OR IGNORE INTO Games (Name, Type, MinBet, MaxBet, IsActive) VALUES
+        ('Blackjack', 'Cards', 5, 1000, 1),
+        ('Slots', 'Slots', 1, 500, 1),
+        ('Craps', 'Dice', 5, 1000, 1),
+        ('Mines', 'Arcade', 1, 500, 1),
+        ('Flip a Coin', 'Arcade', 1, 300, 1),
+        ('Wheel of Fortune', 'Wheel', 1, 500, 1),
+        ('Scratch Cards', 'Scratch', 5, 500, 1),
+        ('Roulette', 'Table', 2, 750, 1);
+    ";
 
             command.ExecuteNonQuery();
         }

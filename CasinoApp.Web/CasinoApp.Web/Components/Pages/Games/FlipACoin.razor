@@ -1,6 +1,9 @@
 @using CasinoApp.DataAccess.DB_operations
+@using CasinoApp.DataAccess.Entities
 @inject CasinoApp.Web.Services.SessionService Session
 @inject PlayerRepository PlayerRepo
+@inject BetRepository BetRepo
+@inject GameRepository GameRepo
 @implements IDisposable
 
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -171,6 +174,9 @@
     private decimal currentBet = 0;
     private decimal lastBet    = 0;
 
+    private int flipGameId = 0;
+    private int? currentBetId = null;
+
     // ── CancellationToken — safe dispose ───────────────────────────────────
     private CancellationTokenSource? _resetCts;
     private readonly Random          _rng = new();
@@ -179,6 +185,10 @@
     protected override void OnInitialized()
     {
         Session.OnChange += OnSessionChanged;
+
+        var game = GameRepo.GetByName("Flip a Coin");
+        if (game != null)
+            flipGameId = game.Id;
     }
 
     private void OnSessionChanged() => InvokeAsync(StateHasChanged);
@@ -224,6 +234,11 @@
         var newBal = Session.CurrentPlayer!.Balance + (double)currentBet;
         Session.UpdateBalance(newBal);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+            if (currentBetId.HasValue)
+            {
+                BetRepo.UpdateStatus(currentBetId.Value, "Won");
+                currentBetId = null;
+            }
         isStreak = false;
     }
 
@@ -255,6 +270,15 @@
             var balAfterBet = Session.CurrentPlayer!.Balance - (double)currentBet;
             Session.UpdateBalance(balAfterBet);
             PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
+
+            currentBetId = BetRepo.Create(new Bet
+            {
+                PlayerId = Session.CurrentPlayer.Id,
+                GameId = flipGameId,
+                SessionId = null,
+                Amount = (double)currentBet,
+                Status = "Pending"
+            });
         }
 
         gameState   = GameState.Flipping;
@@ -282,6 +306,11 @@
                 var newBal = Session.CurrentPlayer!.Balance + (double)doubledPot;
                 Session.UpdateBalance(newBal);
                 PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+                if (currentBetId.HasValue)
+                {
+                    BetRepo.UpdateStatus(currentBetId.Value, "Won");
+                    currentBetId = null;
+                }
 
                 resultMsg += " LIMITĂ ATINSĂ!";
                 lastBet = currentBet;
@@ -305,6 +334,12 @@
             lastBet = currentBet;
             currentBet = 0;
             isStreak = false; 
+
+            if (currentBetId.HasValue)
+            {
+                BetRepo.UpdateStatus(currentBetId.Value, "Lost");
+                currentBetId = null;
+            }
         }
 
         gameState  = GameState.Result;

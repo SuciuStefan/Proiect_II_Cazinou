@@ -1,6 +1,9 @@
 @using CasinoApp.DataAccess.DB_operations
+@using CasinoApp.DataAccess.Entities
 @inject CasinoApp.Web.Services.SessionService Session
 @inject PlayerRepository PlayerRepo
+@inject BetRepository BetRepo
+@inject GameRepository GameRepo
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -363,6 +366,9 @@ window.barbutGame = (function () {
     private double netGain    = 0;
     private int    beatCount = 0;
 
+    private int barbutGameId = 0;
+    private int? currentBetId = null;
+
     private List<int> history = new();
     private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
     private DotNetObjectReference<Barbut>? dotnetRef;
@@ -371,6 +377,10 @@ window.barbutGame = (function () {
     {
         Session.OnChange += Refresh;
         PickRandomAINames();
+
+        var game = GameRepo.GetByName("Craps");
+        if (game != null)
+            barbutGameId = game.Id;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -434,6 +444,14 @@ window.barbutGame = (function () {
         }
 
         var balAfterBet = Session.CurrentPlayer.Balance - betAmount;
+        currentBetId = BetRepo.Create(new Bet
+        {
+            PlayerId = Session.CurrentPlayer.Id,
+            GameId = barbutGameId,
+            SessionId = null,
+            Amount = betAmount,
+            Status = "Pending"
+        });
         Session.UpdateBalance(balAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
 
@@ -485,6 +503,15 @@ window.barbutGame = (function () {
 
         isRolling  = false;
         showResult = true;
+        if (currentBetId.HasValue)
+        {
+            string status = netGain > 0 ? "Won"
+                          : netGain == 0 ? "Push"
+                          : "Lost";
+
+            BetRepo.UpdateStatus(currentBetId.Value, status);
+            currentBetId = null;
+        }
         betAmount  = 0;
 
         await InvokeAsync(StateHasChanged);

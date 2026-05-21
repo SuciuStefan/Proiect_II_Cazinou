@@ -1,6 +1,9 @@
 @using CasinoApp.DataAccess.DB_operations
+@using CasinoApp.DataAccess.Entities
 @inject CasinoApp.Web.Services.SessionService Session
 @inject PlayerRepository PlayerRepo
+@inject BetRepository BetRepo
+@inject GameRepository GameRepo
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -341,6 +344,8 @@ window.scratchCardGame = (function () {
     private List<int> winningRows  = new();
     private double    totalWin     = 0;
     private string    errorMsg     = "";
+    private int scratchGameId = 0;
+    private int? currentBetId = null;
 
     private DotNetObjectReference<ScratchCard>? dotnetRef;
     private bool needsJsInit = false;
@@ -348,6 +353,13 @@ window.scratchCardGame = (function () {
     protected override void OnInitialized()
     {
         dotnetRef = DotNetObjectReference.Create(this);
+
+        var game = GameRepo.GetByName("Scratch Cards");
+
+        if (game != null)
+        {
+            scratchGameId = game.Id;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -378,19 +390,44 @@ window.scratchCardGame = (function () {
 
     private void BuyCard()
     {
-        if (selectedCost == 0)                              { errorMsg = "Alege un bilet mai intai!"; return; }
-        if (Session.CurrentPlayer!.Balance < selectedCost)  { errorMsg = "Balanta insuficienta!";    return; }
+        if (selectedCost == 0)
+        {
+            errorMsg = "Alege un bilet mai întâi!";
+            return;
+        }
+
+        if (Session.CurrentPlayer!.Balance < selectedCost)
+        {
+            errorMsg = "Balanță insuficientă!";
+            return;
+        }
+
+        if (scratchGameId == 0)
+        {
+            errorMsg = "Jocul Scratch Cards nu există în baza de date.";
+            return;
+        }
 
         var newBalance = Session.CurrentPlayer.Balance - selectedCost;
 
-PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
-Session.UpdateBalance(newBalance);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
+        Session.UpdateBalance(newBalance);
+
+        currentBetId = BetRepo.Create(new Bet
+        {
+            PlayerId = Session.CurrentPlayer.Id,
+            GameId = scratchGameId,
+            SessionId = null,
+            Amount = selectedCost,
+            Status = "Pending"
+        });
 
         GenerateGrid();
-        winningRows  = new();
-        totalWin     = 0;
-        needsJsInit  = true;
-        gameState    = GameState.Scratching;
+
+        winningRows = new();
+        totalWin = 0;
+        needsJsInit = true;
+        gameState = GameState.Scratching;
     }
 
     private async Task RevealAll()
@@ -409,7 +446,7 @@ Session.UpdateBalance(newBalance);
     private void CalculateResult()
     {
         winningRows = new();
-        totalWin    = 0;
+        totalWin = 0;
 
         for (int row = 0; row < 3; row++)
         {
@@ -420,6 +457,7 @@ Session.UpdateBalance(newBalance);
             if (a == b && b == c)
             {
                 winningRows.Add(row);
+
                 var sym = symbols.First(s => s.Emoji == a);
                 totalWin += sym.Multiplier * selectedCost;
             }
@@ -431,6 +469,18 @@ Session.UpdateBalance(newBalance);
 
             PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
             Session.UpdateBalance(newBalance);
+
+            if (currentBetId.HasValue)
+            {
+                BetRepo.UpdateStatus(currentBetId.Value, "Won");
+            }
+        }
+        else
+        {
+            if (currentBetId.HasValue)
+            {
+                BetRepo.UpdateStatus(currentBetId.Value, "Lost");
+            }
         }
     }
 

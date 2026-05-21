@@ -1,6 +1,9 @@
 @using CasinoApp.DataAccess.DB_operations
+@using CasinoApp.DataAccess.Entities
 @inject CasinoApp.Web.Services.SessionService Session
 @inject PlayerRepository PlayerRepo
+@inject BetRepository BetRepo
+@inject GameRepository GameRepo
 @implements IDisposable
 
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -296,9 +299,19 @@
     };
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
-    protected override void OnInitialized() => Session.OnChange += OnSessionChanged;
+    protected override void OnInitialized()
+    {
+        Session.OnChange += OnSessionChanged;
+
+        var game = GameRepo.GetByName("Mines");
+        if (game != null)
+            minesGameId = game.Id;
+    }
     private void OnSessionChanged() => InvokeAsync(StateHasChanged);
     public void Dispose()           => Session.OnChange -= OnSessionChanged;
+
+    private int minesGameId = 0;
+    private int? currentBetId = null;
 
     // ── Configurare ───────────────────────────────────────────────────────
     private void SetGridSize(int gs)
@@ -345,6 +358,14 @@
 
         // Deduce pariul
         var newBal = Session.CurrentPlayer!.Balance - (double)currentBet;
+        currentBetId = BetRepo.Create(new Bet
+        {
+            PlayerId = Session.CurrentPlayer.Id,
+            GameId = minesGameId,
+            SessionId = null,
+            Amount = (double)currentBet,
+            Status = "Pending"
+        });
         Session.UpdateBalance(newBal);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
 
@@ -372,11 +393,16 @@
 
         if (mineSet.Contains(idx))
         {
-            // MINA! Marcheaza cea explodata si dezvaluie restul
             cells[idx] = CellState.MineBoom;
             RevealAllMines();
             RevealAllSafes();
             gameState = GameState.GameOver;
+
+            if (currentBetId.HasValue)
+            {
+                BetRepo.UpdateStatus(currentBetId.Value, "Lost");
+                currentBetId = null;
+            }
         }
         else
         {
@@ -400,6 +426,11 @@
         var newBal = Session.CurrentPlayer!.Balance + (double)cashOutWin;
         Session.UpdateBalance(newBal);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+        if (currentBetId.HasValue)
+        {
+            BetRepo.UpdateStatus(currentBetId.Value, "Won");
+            currentBetId = null;
+        }
 
         lastBet   = currentBet;
         currentBet = 0;

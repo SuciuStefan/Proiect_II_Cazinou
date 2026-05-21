@@ -1,6 +1,9 @@
 @using CasinoApp.DataAccess.DB_operations
+@using CasinoApp.DataAccess.Entities
 @inject CasinoApp.Web.Services.SessionService Session
 @inject PlayerRepository PlayerRepo
+@inject BetRepository BetRepo
+@inject GameRepository GameRepo
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -292,11 +295,17 @@
     private readonly Random _rng = new();
     private string StorageKey => $"wof_spin_{Session.CurrentPlayer!.Id}";
 
+    private int wheelGameId = 0;
+    private int? currentBetId = null;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += OnSessionChanged;
-        StartCountdownTimer();
+
+        var game = GameRepo.GetByName("Wheel of Fortune");
+        if (game != null)
+            wheelGameId = game.Id;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -375,6 +384,14 @@
         catch { }
 
         hasSpunToday = true;
+        currentBetId = BetRepo.Create(new Bet
+        {
+            PlayerId = Session.CurrentPlayer!.Id,
+            GameId = wheelGameId,
+            SessionId = null,
+            Amount = 0,
+            Status = "Pending"
+        });
         isSpinning = true;
         showResult = false;
         revealPhase = 0;
@@ -406,6 +423,15 @@
             if (wonSlot.CashValue > 0)
             {
                 var nb = Session.CurrentPlayer!.Balance + (double)wonSlot.CashValue;
+                if (currentBetId.HasValue)
+                {
+                    BetRepo.UpdateStatus(
+                        currentBetId.Value,
+                        wonSlot.CashValue > 0 ? "Won" : "Lost"
+                    );
+
+                    currentBetId = null;
+                }
                 Session.UpdateBalance(nb);
                 PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, nb);
                 resultMsg = $"FELICITĂRI! AI CÂȘTIGAT {wonSlot.CashValue:N0} RON!";

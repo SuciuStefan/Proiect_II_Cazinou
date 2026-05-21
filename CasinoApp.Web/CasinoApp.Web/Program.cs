@@ -6,6 +6,8 @@ using CasinoApp.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<PlayerRepository>();
+builder.Services.AddScoped<BetRepository>();
+builder.Services.AddScoped<GameRepository>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<EmailService>();
 

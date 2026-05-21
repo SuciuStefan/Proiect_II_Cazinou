@@ -136,16 +136,18 @@ namespace CasinoApp.DataAccess.DB_operations
             return bets;
         }
 
-        public void Create(Bet bet)
+        public int Create(Bet bet)
         {
             using var connection = DbManager.GetConnection();
             connection.Open();
 
             var command = connection.CreateCommand();
             command.CommandText = @"
-                INSERT INTO Bets (PlayerId, GameId, SessionId, Amount, Status)
-                VALUES ($playerId, $gameId, $sessionId, $amount, $status);
-            ";
+        INSERT INTO Bets (PlayerId, GameId, SessionId, Amount, Status)
+        VALUES ($playerId, $gameId, $sessionId, $amount, $status);
+
+        SELECT last_insert_rowid();
+    ";
 
             command.Parameters.AddWithValue("$playerId", bet.PlayerId);
             command.Parameters.AddWithValue("$gameId", bet.GameId);
@@ -153,7 +155,9 @@ namespace CasinoApp.DataAccess.DB_operations
             command.Parameters.AddWithValue("$amount", bet.Amount);
             command.Parameters.AddWithValue("$status", bet.Status);
 
-            command.ExecuteNonQuery();
+            var result = command.ExecuteScalar();
+
+            return Convert.ToInt32(result);
         }
 
         public void UpdateStatus(int betId, string status)
@@ -169,6 +173,23 @@ namespace CasinoApp.DataAccess.DB_operations
             ";
 
             command.Parameters.AddWithValue("$status", status);
+            command.Parameters.AddWithValue("$betId", betId);
+
+            command.ExecuteNonQuery();
+        }
+        public void UpdateAmount(int betId, double amount)
+        {
+            using var connection = DbManager.GetConnection();
+            connection.Open();
+
+            var command = connection.CreateCommand();
+            command.CommandText = @"
+        UPDATE Bets
+        SET Amount = $amount
+        WHERE Id = $betId;
+    ";
+
+            command.Parameters.AddWithValue("$amount", amount);
             command.Parameters.AddWithValue("$betId", betId);
 
             command.ExecuteNonQuery();

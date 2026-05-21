@@ -370,13 +370,28 @@
 
             <div class="section-title">JOCURILE NOASTRE</div>
             <div class="games-grid">
-                <div class="game-card @(activeGame=="blackjack"?"selected":"")"     @onclick='()=>TrySetGame("blackjack")'><div class="gi bj">🃏</div><div class="gn">BlackJack</div><div class="gd">Ajunge la 21 fără să treci</div><span class="gb hot">HOT</span></div>
-                <div class="game-card @(activeGame=="slots"?"selected":"")"         @onclick='()=>TrySetGame("slots")'><div class="gi sl">🎰</div><div class="gn">Slots</div><div class="gd">Jackpot-uri uriașe te așteaptă</div><span class="gb new">NOU</span></div>
-                <div class="game-card @(activeGame=="craps"?"selected":"")"         @onclick='()=>TrySetGame("craps")'><div class="gi cr">🎲</div><div class="gn">Craps</div><div class="gd">Barbut — zaruri și adrenalină</div></div>
-                <div class="game-card @(activeGame=="roulette-red"?"selected":"")"  @onclick='()=>TrySetGame("roulette-red")'><div class="gi ro">🎡</div><div class="gn">Ruletă</div><div class="gd">Roșu, negru sau verde</div><span class="gb live">LIVE</span></div>
-                <div class="game-card @(activeGame=="mines"?"selected":"")"         @onclick='()=>TrySetGame("mines")'><div class="gi mn">💣</div><div class="gn">Mines</div><div class="gd">Găsește diamantele, evită minele</div><span class="gb hot">HOT</span></div>                <div class="game-card @(activeGame=="flipacoin"?"selected":"")"     @onclick='()=>TrySetGame("flipacoin")'><div class="gi ba">🪙</div><div class="gn">Flip a Coin</div><div class="gd">Cap sau pajura — 50/50</div><span class="gb new">NOU</span></div>
-                <div class="game-card @(activeGame=="wheel"?"selected":"")"         @onclick='()=>TrySetGame("wheel")'><div class="gi wh">🎯</div><div class="gn">Roata Norocului</div><div class="gd">Învârte și câștigă</div><span class="gb new">NOU</span></div>
-                <div class="game-card @(activeGame=="scratch"?"selected":"")"       @onclick='()=>TrySetGame("scratch")'><div class="gi sc">🎟️</div><div class="gn">Scratch Cards</div><div class="gd">Zgârie și descoperă premiul</div></div>
+                @foreach (var game in games)
+                {
+                    var gameKey = GetGameKeyFromDb(game);
+
+                    <div class="game-card @(activeGame == gameKey ? "selected" : "")"
+                         @onclick="() => TrySetGame(gameKey)">
+
+                        <div class="gi @GetGameCss(game)">
+                            @GetGameIcon(game)
+                        </div>
+
+                        <div class="gn">@game.Name</div>
+
+                        <div class="gd">
+                            @GetGameDescription(game)
+                        </div>
+
+                        <div class="game-db-info">
+                            Min: @game.MinBet.ToString("F0") RON · Max: @game.MaxBet.ToString("F0") RON
+                        </div>
+                    </div>
+                }
             </div>
 
             <!-- ZONA JOC — are id pt smooth scroll -->
@@ -433,6 +448,9 @@
     private string successPopupTitle = "";
     private string successPopupMessage = "";
 
+    private readonly GameRepository GameRepo = new();
+    private List<Game> games = new();
+
 private List<Transaction> transactionHistory = new();
 
 private readonly TransactionRepository TransactionRepo = new();
@@ -450,6 +468,7 @@ private readonly TransactionRepository TransactionRepo = new();
     protected override void OnInitialized()
 {
     Session.OnChange += RefreshBalance;
+        games = GameRepo.GetActiveGames();
 }
 
 private void RefreshBalance()
@@ -637,7 +656,7 @@ private void LoadTransactionHistory()
             return;
         }
 
-        // Validare cap balanță la depozit — afișează eroare în loc să taie silențios
+       
         if (walletMode == "deposit" && currentBalance + walletAmount > SessionService.MaxBalance)
         {
             double spaceLeft = SessionService.MaxBalance - currentBalance;
@@ -706,6 +725,69 @@ private void LoadTransactionHistory()
         showSuccessPopup = false;
         successPopupTitle = "";
         successPopupMessage = "";
+    }
+    private string GetGameKeyFromDb(Game game)
+    {
+        return game.Name switch
+        {
+            "Blackjack" => "blackjack",
+            "Slots" => "slots",
+            "Craps" => "craps",
+            "Mines" => "mines",
+            "Flip a Coin" => "flipacoin",
+            "Wheel of Fortune" => "wheel",
+            "Scratch Cards" => "scratch",
+            "Roulette" => "roulette-red",
+            _ => game.Name.ToLower().Replace(" ", "")
+        };
+    }
+
+    private string GetGameIcon(Game game)
+    {
+        return game.Name switch
+        {
+            "Blackjack" => "🃏",
+            "Slots" => "🎰",
+            "Craps" => "🎲",
+            "Mines" => "💣",
+            "Flip a Coin" => "🪙",
+            "Wheel of Fortune" => "🎯",
+            "Scratch Cards" => "🎟️",
+            "Roulette" => "🎡",
+            _ => "🎮"
+        };
+    }
+
+    private string GetGameDescription(Game game)
+    {
+        return game.Name switch
+        {
+            "Blackjack" => "Ajunge la 21 fără să treci",
+            "Slots" => "Jackpot-uri uriașe te așteaptă",
+            "Craps" => "Barbut — zaruri și noroc",
+            "Mines" => "Evită minele și câștigă",
+            "Flip a Coin" => "Alege cap sau pajură",
+            "Wheel of Fortune" => "Învârte roata norocului",
+            "Scratch Cards" => "Zgârie și descoperă premiul",
+            "Roulette" => "Pariază pe roșu, negru sau verde",
+            _ => game.Type
+        };
+    }
+
+    private string GetGameCss(Game game)
+    {
+        return game.Name switch
+        {
+            "Blackjack" => "bj",
+            "Slots" => "sl",
+            "Craps" => "cr",
+            "Mines" => "mn",
+            "Flip a Coin" => "fc",
+            "Wheel of Fortune" => "wh",
+            "Scratch Cards" => "sc",
+            "Roulette" => "rl",
+            _ => "sl"
+        };
     }
 }
 
@@ -1463,6 +1545,13 @@ private void LoadTransactionHistory()
             opacity: 1;
             transform: scale(1);
         }
+    }
+    .game-db-info {
+        margin-top: 8px;
+        color: #777;
+        font-family: var(--fb);
+        font-size: 0.82rem;
+        letter-spacing: 1px;
     }
 </style>
 

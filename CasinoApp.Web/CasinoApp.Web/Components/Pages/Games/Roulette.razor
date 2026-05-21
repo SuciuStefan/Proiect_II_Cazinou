@@ -1,6 +1,9 @@
 @using CasinoApp.DataAccess.DB_operations
+@using CasinoApp.DataAccess.Entities
 @inject CasinoApp.Web.Services.SessionService Session
 @inject PlayerRepository PlayerRepo
+@inject BetRepository BetRepo
+@inject GameRepository GameRepo
 @implements IDisposable
 
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -356,9 +359,16 @@
     private double currentWheelDeg = 0;
     private double currentBallDeg = 0;
 
+    private int rouletteGameId = 0;
+    private int? currentBetId = null;
+
     protected override void OnInitialized()
     {
         Session.OnChange += Refresh;
+
+        var game = GameRepo.GetByName("Roulette");
+        if (game != null)
+            rouletteGameId = game.Id;
     }
 
     private void Refresh() => InvokeAsync(StateHasChanged);
@@ -410,6 +420,14 @@
         if (Session.CurrentPlayer!.Balance < totalBet) { errorMsg = "Balanță insuficientă!"; return; }
 
         var balAfterBet = Session.CurrentPlayer.Balance - totalBet;
+        currentBetId = BetRepo.Create(new Bet
+        {
+            PlayerId = Session.CurrentPlayer.Id,
+            GameId = rouletteGameId,
+            SessionId = null,
+            Amount = totalBet,
+            Status = "Pending"
+        });
         Session.UpdateBalance(balAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
 
@@ -483,6 +501,15 @@
             var newBal = Session.CurrentPlayer!.Balance + totalWin;
             Session.UpdateBalance(newBal);
             PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+        }
+        if (currentBetId.HasValue)
+        {
+            BetRepo.UpdateStatus(
+                currentBetId.Value,
+                totalWin > 0 ? "Won" : "Lost"
+            );
+
+            currentBetId = null;
         }
     }
 

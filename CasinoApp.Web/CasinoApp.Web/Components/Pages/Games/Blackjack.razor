@@ -1,6 +1,9 @@
 @using CasinoApp.DataAccess.DB_operations
+@using CasinoApp.DataAccess.Entities
 @inject CasinoApp.Web.Services.SessionService Session
 @inject PlayerRepository PlayerRepo
+@inject BetRepository BetRepo
+@inject GameRepository GameRepo
 @implements IDisposable
 
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -319,11 +322,17 @@
     // ── CancellationToken — protejeaza ResetAfterDelayAsync la Dispose ────
     private CancellationTokenSource? _resetCts;
 
+    private int blackjackGameId = 0;
+    private int? currentBetId = null;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += OnSessionChanged;
-        BuildDeck(); // pachetul se construieste o singura data la pornire
+
+        var game = GameRepo.GetByName("Blackjack");
+        if (game != null)
+            blackjackGameId = game.Id;
     }
 
     private void OnSessionChanged() => InvokeAsync(StateHasChanged);
@@ -382,6 +391,14 @@
 
         // Deduce pariul din balanta
         var balAfterBet = Session.CurrentPlayer.Balance - (double)currentBet;
+        currentBetId = BetRepo.Create(new Bet
+        {
+            PlayerId = Session.CurrentPlayer.Id,
+            GameId = blackjackGameId,
+            SessionId = null,
+            Amount = (double)currentBet,
+            Status = "Pending"
+        });
         Session.UpdateBalance(balAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
 
@@ -444,6 +461,10 @@
         }
 
         insuranceBet = insuranceAmount;
+        if (currentBetId.HasValue)
+        {
+            BetRepo.UpdateAmount(currentBetId.Value, (double)(currentBet + splitBet + insuranceBet));
+        }
         var bal = Session.CurrentPlayer.Balance - (double)insuranceBet;
         Session.UpdateBalance(bal);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, bal);
@@ -539,6 +560,10 @@
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterDouble);
 
         currentBet *= 2;
+        if (currentBetId.HasValue)
+        {
+            BetRepo.UpdateAmount(currentBetId.Value, (double)currentBet);
+        }
         playerHand.Add(Draw());
 
         if (hasSplit && !mainHandDone)
@@ -567,6 +592,10 @@
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, bal);
 
         splitBet           = currentBet;
+        if (currentBetId.HasValue)
+        {
+            BetRepo.UpdateAmount(currentBetId.Value, (double)(currentBet + splitBet));
+        }
         hasSplit           = true;
         isPlayingSplitHand = false;
         mainHandDone       = false;
@@ -671,6 +700,17 @@
         // Actualizeaza balanta o singura data, cu totalul acumulat
         Session.UpdateBalance((double)newBalance);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, (double)newBalance);
+        if (currentBetId.HasValue)
+        {
+            decimal totalResult = resultWin + splitResultWin;
+
+            string status = totalResult > 0 ? "Won"
+                          : totalResult == 0 ? "Push"
+                          : "Lost";
+
+            BetRepo.UpdateStatus(currentBetId.Value, status);
+            currentBetId = null;
+        }
 
         // Salveaza pariul original pentru butonul Rebet
         lastBet    = originalBet;
