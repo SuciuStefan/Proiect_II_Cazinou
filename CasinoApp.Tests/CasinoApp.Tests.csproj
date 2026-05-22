@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CasinoApp.BusinessLogic\CasinoApp.BusinessLogic.csproj" />
     <ProjectReference Include="..\CasinoApp.DataAccess\CasinoApp.DataAccess.csproj" />
+    <ProjectReference Include="..\CasinoApp.Web\CasinoApp.Web\CasinoApp.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>

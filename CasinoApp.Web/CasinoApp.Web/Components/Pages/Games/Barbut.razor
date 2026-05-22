@@ -541,7 +541,7 @@ window.barbutGame = (function () {
         playerSum < aiSums[idx] ? "verdict-win" : playerSum > aiSums[idx] ? "verdict-lose" : "verdict-push";
 
     private string GetAIVerdictText(int idx) =>
-        playerSum < aiSums[idx] ? "ȘI-A BĂT JUCĂTORUL" :
+        playerSum < aiSums[idx] ? "ȘI-A BĂTUT JUCĂTORUL" :
         playerSum > aiSums[idx] ? "BĂTUT DE JUCĂTOR" : "EGALITATE";
 
     private string BuildDieDots(int value)
