@@ -165,7 +165,7 @@ namespace CasinoApp.BusinessLogic.Services
             PlayerSum < AISums[idx] ? "verdict-win" : PlayerSum > AISums[idx] ? "verdict-lose" : "verdict-push";
 
         public string GetAIVerdictText(int idx) =>
-            PlayerSum < AISums[idx] ? "ȘI-A BĂT JUCĂTORUL" :
+            PlayerSum < AISums[idx] ? "A BĂTUT JUCĂTORUL" :
             PlayerSum > AISums[idx] ? "BĂTUT DE JUCĂTOR" : "EGALITATE";
 
         public string BuildDieDots(int value)

@@ -384,23 +384,7 @@
         revealPhase = 4; await InvokeAsync(StateHasChanged);
     }
 
-<<<<<<< HEAD
     private void CloseReveal() { revealPhase = 0; showResult = false; StateHasChanged(); }
-=======
-    private void CloseReveal()
-    {
-        revealPhase = 0;
-        showResult = false;
-
-        try
-        {
-            StateHasChanged();
-        }
-        catch (InvalidOperationException)
-        {
-        }
-    }
->>>>>>> d8533b22bea47dcbbf8a32120d2f2049c081f36f
 }
 
 <style>

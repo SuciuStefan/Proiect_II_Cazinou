@@ -453,51 +453,6 @@ window.barbutGame = (function () {
 
         await InvokeAsync(StateHasChanged);
     }
-<<<<<<< HEAD
-=======
-
-    private string GetPlayerCardClass()
-    {
-        if (beatCount == 3) return "card-winner";
-        if (beatCount == 0) return "card-loser";
-        return "card-neutral";
-    }
-
-    private string GetPlayerSumClass() =>
-        beatCount == 3 ? "sum-win" : beatCount == 0 ? "sum-lose" : "sum-push";
-
-    private string GetAICardClass(int idx)
-    {
-        if (playerSum < aiSums[idx]) return "card-winner";
-        if (playerSum > aiSums[idx]) return "card-loser";
-        return "card-neutral";
-    }
-
-    private string GetAISumClass(int idx) =>
-        playerSum < aiSums[idx] ? "sum-win" : playerSum > aiSums[idx] ? "sum-lose" : "sum-push";
-
-    private string GetAIVerdictClass(int idx) =>
-        playerSum < aiSums[idx] ? "verdict-win" : playerSum > aiSums[idx] ? "verdict-lose" : "verdict-push";
-
-    private string GetAIVerdictText(int idx) =>
-        playerSum < aiSums[idx] ? "ȘI-A BĂTUT JUCĂTORUL" :
-        playerSum > aiSums[idx] ? "BĂTUT DE JUCĂTOR" : "EGALITATE";
-
-    private string BuildDieDots(int value)
-    {
-        var dots = value switch
-        {
-            1 => new[] { "mc" },
-            2 => new[] { "tr", "bl" },
-            3 => new[] { "tr", "mc", "bl" },
-            4 => new[] { "tl", "tr", "bl", "br" },
-            5 => new[] { "tl", "tr", "mc", "bl", "br" },
-            6 => new[] { "tl", "tr", "ml", "mr", "bl", "br" },
-            _ => Array.Empty<string>()
-        };
-        return string.Concat(dots.Select(p => $"<span class='dot dot-{p}'></span>"));
-    }
->>>>>>> d8533b22bea47dcbbf8a32120d2f2049c081f36f
 }
 
 <style>
