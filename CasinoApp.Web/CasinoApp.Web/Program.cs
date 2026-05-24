@@ -1,8 +1,9 @@
 using CasinoApp.DataAccess;
 using CasinoApp.DataAccess.DB_operations;
-using CasinoApp.Web.Client.Pages;
 using CasinoApp.Web.Components;
 using CasinoApp.Web.Services;
+using CasinoApp.BusinessLogic.Services;
+
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<PlayerRepository>();
@@ -11,12 +12,21 @@ builder.Services.AddScoped<GameRepository>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<EmailService>();
 
+//JOCURI
+builder.Services.AddScoped<IBlackjackService, BlackjackService>();
+builder.Services.AddScoped<IBarbutService, BarbutService>();
+builder.Services.AddScoped<IFlipACoinService, FlipACoinService>();
+builder.Services.AddScoped<IMinesService, MinesService>();
+builder.Services.AddScoped<IRouletteService, RouletteService>();
+builder.Services.AddScoped<IScratchCardService, ScratchCardService>();
+builder.Services.AddScoped<ISlotsService, SlotsService>();
+builder.Services.AddScoped<IWheelOfFortuneService, WheelOfFortuneService>();
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 
-builder.Services.AddScoped<PlayerRepository>();
 var app = builder.Build();
 DatabaseInitializer.Initialize();
 

@@ -8,6 +8,7 @@
   </PropertyGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\CasinoApp.BusinessLogic\CasinoApp.BusinessLogic.csproj" />
 		<ProjectReference Include="..\CasinoApp.Web.Client\CasinoApp.Web.Client.csproj" />
 		<ProjectReference Include="..\..\CasinoApp.DataAccess\CasinoApp.DataAccess.csproj" />
 		<PackageReference Include="MailKit" Version="4.16.0" />

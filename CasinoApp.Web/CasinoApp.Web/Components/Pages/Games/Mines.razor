@@ -1,6 +1,8 @@
 @using CasinoApp.DataAccess.DB_operations
 @using CasinoApp.DataAccess.Entities
+@using CasinoApp.BusinessLogic.Services
 @inject CasinoApp.Web.Services.SessionService Session
+@inject IMinesService MN
 @inject PlayerRepository PlayerRepo
 @inject BetRepository BetRepo
 @inject GameRepository GameRepo
@@ -13,56 +15,56 @@
     @* ══ SIDEBAR STANGA ══════════════════════════════════════════════════════ *@
     <div class="mn-sidebar">
 
-        @* Balanta *@
         <div class="mn-bal-box">
             <span class="mn-lbl">BALANTĂ</span>
             <span class="mn-bal-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
         </div>
 
-        @* ── Configurare: disponibila DOAR inainte de start ───────────────── *@
-        @if (gameState == GameState.Idle)
+        @* ── Configurare — doar inainte de start ─────────────────────────── *@
+        @if (MN.GameState == MinesGameState.Idle)
         {
-            @* Grid Size *@
+            @* Grid size *@
             <div class="mn-section">
                 <span class="mn-lbl">DIMENSIUNE GRILA</span>
                 <div class="mn-grid-btns">
-                    @foreach (var gs in GridSizes)
+                    @foreach (var gs in MinesService.GridSizes)
                     {
                         int gsc = gs;
-                        <button class="mn-gs-btn @(gridSize == gsc ? "gs-active" : "")"
-                                @onclick="() => SetGridSize(gsc)">
+                        <button class="mn-gs-btn @(MN.GridSize == gsc ? "gs-active" : "")"
+                                @onclick="() => MN.SetGridSize(gsc)">
                             @gsc
                         </button>
                     }
                 </div>
             </div>
 
-            @* Mines count *@
+            @* Mine count slider *@
             <div class="mn-section">
-                <span class="mn-lbl">NUMAR MINE — <span class="mn-lbl-val">@mineCount</span></span>
+                <span class="mn-lbl">NUMAR MINE — <span class="mn-lbl-val">@MN.MineCount</span></span>
                 <div class="mn-slider-row">
                     <span class="mn-slider-min">1</span>
-                    <input type="range" class="mn-slider" min="1" max="@MaxMines"
-                           @bind="mineCount" @bind:event="oninput"
-                           style="--val: @(((double)(mineCount - 1) / Math.Max(MaxMines - 1, 1) * 100).ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%" />
-                    <span class="mn-slider-max">@MaxMines</span>
+                    <input type="range" class="mn-slider" min="1" max="@MN.MaxMines"
+                           value="@MN.MineCount"
+                           @oninput="e => MN.SetMineCount(int.Parse(e.Value!.ToString()!))"
+                           style="--val: @(((double)(MN.MineCount - 1) / Math.Max(MN.MaxMines - 1, 1) * 100).ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%" />
+                    <span class="mn-slider-max">@MN.MaxMines</span>
                 </div>
                 <div class="mn-mine-info">
-                    <span>💣 @mineCount mine</span>
-                    <span>💎 @(gridSize - mineCount) sigure</span>
+                    <span>💣 @MN.MineCount mine</span>
+                    <span>💎 @(MN.GridSize - MN.MineCount) sigure</span>
                 </div>
             </div>
 
-            @* Pariu — chips *@
+            @* Bet chips *@
             <div class="mn-section">
                 <span class="mn-lbl">MIZA</span>
                 <div class="mn-bet-display">
-                    @if (currentBet > 0)
+                    @if (MN.CurrentBet > 0)
                     {
-                        <span class="mn-bet-val">@currentBet RON</span>
+                        <span class="mn-bet-val">@MN.CurrentBet RON</span>
                         <button class="mn-bet-half" @onclick="HalfBet" title="½">½</button>
                         <button class="mn-bet-dbl"  @onclick="DoubleBet" title="2×"
-                                disabled="@(Session.CurrentPlayer!.Balance < (double)currentBet)">2×</button>
+                                disabled="@(Session.CurrentPlayer!.Balance < (double)MN.CurrentBet)">2×</button>
                     }
                     else
                     {
@@ -70,7 +72,7 @@
                     }
                 </div>
                 <div class="mn-chips-row">
-                    @foreach (var cv in ChipDenoms)
+                    @foreach (var cv in MinesService.ChipDenoms)
                     {
                         int c = cv;
                         bool ok = Session.CurrentPlayer!.Balance >= c;
@@ -81,48 +83,48 @@
                         </button>
                     }
                 </div>
-                @if (currentBet > 0)
+                @if (MN.CurrentBet > 0)
                 {
-                    <button class="mn-clear-btn" @onclick="ClearBet">✕ STERGE MIZA</button>
+                    <button class="mn-clear-btn" @onclick="() => MN.ClearBet()">✕ STERGE MIZA</button>
                 }
             </div>
         }
 
         @* ── Info in-game ─────────────────────────────────────────────────── *@
-        @if (gameState == GameState.Playing)
+        @if (MN.GameState == MinesGameState.Playing)
         {
             <div class="mn-section">
                 <span class="mn-lbl">MIZA</span>
-                <span class="mn-info-val">@currentBet.ToString("F2") RON</span>
+                <span class="mn-info-val">@MN.CurrentBet.ToString("F2") RON</span>
             </div>
             <div class="mn-section">
                 <span class="mn-lbl">MINE PE TABLA</span>
-                <span class="mn-info-val">💣 @mineCount</span>
+                <span class="mn-info-val">💣 @MN.MineCount</span>
             </div>
             <div class="mn-section">
                 <span class="mn-lbl">SIGURE DEZVALUITE</span>
-                <span class="mn-info-val">💎 @safeRevealed</span>
+                <span class="mn-info-val">💎 @MN.SafeRevealed</span>
             </div>
         }
 
         @* ── Multiplier + potential win ───────────────────────────────────── *@
-        @if (gameState == GameState.Playing)
+        @if (MN.GameState == MinesGameState.Playing)
         {
-            <div class="mn-mult-box @(safeRevealed > 0 ? "mult-active" : "")">
+            <div class="mn-mult-box @(MN.SafeRevealed > 0 ? "mult-active" : "")">
                 <span class="mn-lbl">MULTIPLICATOR CURENT</span>
-                <span class="mn-mult-val">@currentMultiplier.ToString("F2")×</span>
-                @if (safeRevealed > 0)
+                <span class="mn-mult-val">@MN.CurrentMultiplier.ToString("F2")×</span>
+                @if (MN.SafeRevealed > 0)
                 {
-                    <span class="mn-pot-win">= @((currentBet * (decimal)currentMultiplier).ToString("F2")) RON</span>
+                    <span class="mn-pot-win">= @((MN.CurrentBet * (decimal)MN.CurrentMultiplier).ToString("F2")) RON</span>
                 }
             </div>
             <div class="mn-next-box">
                 <span class="mn-lbl">URMATOAREA CELULA (daca e sigura)</span>
-                <span class="mn-next-val">@GetNextMultiplier().ToString("F2")×</span>
+                <span class="mn-next-val">@MN.GetNextMultiplier().ToString("F2")×</span>
             </div>
         }
 
-        @* ── Eroare *@
+        @* ── Eroare ───────────────────────────────────────────────────────── *@
         @if (!string.IsNullOrEmpty(errorMsg))
         {
             <div class="mn-error">@errorMsg</div>
@@ -130,25 +132,27 @@
 
         @* ── Butoane principale ───────────────────────────────────────────── *@
         <div class="mn-actions">
-            @if (gameState == GameState.Idle)
+            @if (MN.GameState == MinesGameState.Idle)
             {
-                <button class="mn-start @(CanStart() ? "" : "mn-off")"
-                        @onclick="StartGame" disabled="@(!CanStart())">
+                <button class="mn-start @(MN.CanStart(Session.CurrentPlayer!.Balance) ? "" : "mn-off")"
+                        @onclick="StartGame"
+                        disabled="@(!MN.CanStart(Session.CurrentPlayer!.Balance))">
                     💣 INCEPE JOCUL
                 </button>
-                @if (lastBet > 0 && Session.CurrentPlayer!.Balance >= (double)lastBet && currentBet == 0)
+                @if (MN.LastBet > 0 && Session.CurrentPlayer!.Balance >= (double)MN.LastBet && MN.CurrentBet == 0)
                 {
-                    <button class="mn-rebet" @onclick="Rebet">↺ REBET (@lastBet RON)</button>
+                    <button class="mn-rebet" @onclick="Rebet">↺ REBET (@MN.LastBet RON)</button>
                 }
             }
-            else if (gameState == GameState.Playing)
+            else if (MN.GameState == MinesGameState.Playing)
             {
-                <button class="mn-cashout @(safeRevealed == 0 ? "mn-off" : "")"
-                        @onclick="CashOut" disabled="@(safeRevealed == 0)">
-                    💰 CASH OUT @((currentBet * (decimal)currentMultiplier).ToString("F2")) RON
+                <button class="mn-cashout @(MN.SafeRevealed == 0 ? "mn-off" : "")"
+                        @onclick="CashOut"
+                        disabled="@(MN.SafeRevealed == 0)">
+                    💰 CASH OUT @((MN.CurrentBet * (decimal)MN.CurrentMultiplier).ToString("F2")) RON
                 </button>
             }
-            else if (gameState == GameState.GameOver || gameState == GameState.CashedOut)
+            else if (MN.GameState == MinesGameState.GameOver || MN.GameState == MinesGameState.CashedOut)
             {
                 <button class="mn-start @(isResetting ? "mn-off" : "")"
                         @onclick="NewRound" disabled="@isResetting">
@@ -157,21 +161,21 @@
             }
         </div>
 
-        @* ── Banner rezultat *@
-        @if (gameState == GameState.GameOver)
+        @* ── Banner rezultat ──────────────────────────────────────────────── *@
+        @if (MN.GameState == MinesGameState.GameOver)
         {
             <div class="mn-result-banner res-lose">
                 <span class="mn-res-icon">💥</span>
                 <span class="mn-res-msg">MINA! AI PIERDUT</span>
-                <span class="mn-res-amt">-@currentBet.ToString("F2") RON</span>
+                <span class="mn-res-amt">-@MN.CurrentBet.ToString("F2") RON</span>
             </div>
         }
-        else if (gameState == GameState.CashedOut)
+        else if (MN.GameState == MinesGameState.CashedOut)
         {
             <div class="mn-result-banner res-win">
                 <span class="mn-res-icon">💎</span>
                 <span class="mn-res-msg">CASH OUT REUSIT!</span>
-                <span class="mn-res-amt">+@cashOutWin.ToString("F2") RON</span>
+                <span class="mn-res-amt">+@MN.CashOutWin.ToString("F2") RON</span>
             </div>
         }
 
@@ -180,70 +184,65 @@
     @* ══ ZONA JOCULUI ════════════════════════════════════════════════════════ *@
     <div class="mn-game-area">
 
-        @* Header *@
         <div class="mn-game-header">
             <span class="mn-game-title">MINES</span>
-            <span class="mn-game-sub">@gridSize casete · @mineCount mine</span>
+            <span class="mn-game-sub">@MN.GridSize casete · @MN.MineCount mine</span>
         </div>
 
-        @* GRILA *@
-        <div class="mn-grid" style="--cols: @cols; --cell-size: @CellSizePx;">
-            @for (int i = 0; i < gridSize; i++)
+        <div class="mn-grid" style="--cols: @MN.Cols; --cell-size: @MN.CellSizePx;">
+            @for (int i = 0; i < MN.GridSize; i++)
             {
                 int idx = i;
-                var state = cells.Length > 0 ? cells[idx] : CellState.Hidden;
-                bool clickable = gameState == GameState.Playing && state == CellState.Hidden;
+                var state = MN.Cells.Length > 0 ? MN.Cells[idx] : MinesCellState.Hidden;
+                bool clickable = MN.GameState == MinesGameState.Playing && state == MinesCellState.Hidden;
 
-                <div class="mn-cell @GetCellClass(state) @(clickable ? "cell-hover" : "")"
+                <div class="mn-cell @MN.GetCellClass(state) @(clickable ? "cell-hover" : "")"
                      @key="@($"c{idx}g{roundKey}")"
                      @onclick="() => RevealCell(idx)"
                      style="--i: @idx;">
-                    @if (state == CellState.Safe)
+                    @if (state == MinesCellState.Safe)
                     {
                         <div class="mn-cell-inner gem-reveal">
                             <span class="mn-gem">💎</span>
-                            <span class="mn-cell-mult">@GetCellMult(idx)</span>
+                            <span class="mn-cell-mult">@MN.GetCellMult(idx)</span>
                         </div>
                     }
-                    else if (state == CellState.Mine)
+                    else if (state == MinesCellState.Mine)
                     {
                         <div class="mn-cell-inner mine-reveal">
                             <span class="mn-bomb">💣</span>
                         </div>
                     }
-                    else if (state == CellState.MineBoom)
+                    else if (state == MinesCellState.MineBoom)
                     {
                         <div class="mn-cell-inner mine-boom">
                             <span class="mn-boom">💥</span>
                         </div>
                     }
-                    else if (state == CellState.SafeUnrevealed)
+                    else if (state == MinesCellState.SafeUnrevealed)
                     {
-                        @* celule sigure dezvaluite la game over/cashout *@
                         <div class="mn-cell-inner safe-ghost">
                             <span class="mn-gem" style="opacity:0.3">💎</span>
                         </div>
                     }
                     else
                     {
-                        @* Hidden — animatie puls daca jocul e activ *@
-                        <div class="mn-cell-inner @(gameState == GameState.Playing ? "cell-idle" : "")"></div>
+                        <div class="mn-cell-inner @(MN.GameState == MinesGameState.Playing ? "cell-idle" : "")"></div>
                     }
                 </div>
             }
         </div>
 
-        @* Win chance indicator *@
-        @if (gameState == GameState.Playing)
+        @if (MN.GameState == MinesGameState.Playing)
         {
-            double winChance = GetWinChance();
+            double winChance = MN.GetWinChance();
             <div class="mn-win-chance">
                 <span class="mn-lbl" style="font-size:0.58rem">SANSA URMATOAREI CELULE SIGURE</span>
                 <div class="mn-chance-bar-wrap">
                     <div class="mn-chance-bar" style="width: @(winChance.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;
-                                                        background: @GetChanceColor(winChance);"></div>
+                                                        background: @MN.GetChanceColor(winChance);"></div>
                 </div>
-                <span class="mn-chance-val" style="color: @GetChanceColor(winChance);">@winChance.ToString("F1")%</span>
+                <span class="mn-chance-val" style="color: @MN.GetChanceColor(winChance);">@winChance.ToString("F1")%</span>
             </div>
         }
 
@@ -253,207 +252,106 @@
 
 @code {
 
-    // ── Tipuri ────────────────────────────────────────────────────────────
-    private enum GameState  { Idle, Playing, GameOver, CashedOut }
-    private enum CellState  { Hidden, Safe, Mine, MineBoom, SafeUnrevealed }
+    // ── UI-only state ─────────────────────────────────────────────────────
+    private int    roundKey    = 0;
+    private bool   isResetting = false;
+    private string errorMsg    = "";
 
-    // ── Config ────────────────────────────────────────────────────────────
-    private static readonly int[] GridSizes  = { 25, 36, 49, 64 };
-    private static readonly int[] ChipDenoms = { 1, 5, 10, 25, 50, 100 };
-    private const decimal MaxBet = 1_000_000m;
-
-    // ── Stare joc ─────────────────────────────────────────────────────────
-    private GameState  gameState    = GameState.Idle;
-    private int        gridSize     = 25;
-    private int        cols         => (int)Math.Sqrt(gridSize);
-    private int        mineCount    = 3;
-    private int        MaxMines     => gridSize - 2;   // cel putin 2 celule sigure
-    private int        roundKey     = 0;
-    private bool       isResetting  = false;
-
-    // ── Celule ────────────────────────────────────────────────────────────
-    private CellState[]     cells       = Array.Empty<CellState>();
-    private HashSet<int>    mineSet     = new();
-    private int             safeRevealed = 0;
-    // Retinem multiplicatorul la care a fost dezvaluita fiecare celula sigura
-    private Dictionary<int, double> cellMultipliers = new();
-
-    // ── Pariu ─────────────────────────────────────────────────────────────
-    private decimal currentBet = 0;
-    private decimal lastBet    = 0;
-    private decimal cashOutWin = 0;
-
-    // ── Multiplier ────────────────────────────────────────────────────────
-    private double currentMultiplier = 1.0;
-
-    // ── Mesaje ────────────────────────────────────────────────────────────
-    private string errorMsg = "";
-
-    // ── Marimea celulei in functie de grid ───────────────────────────────
-    private string CellSizePx => gridSize switch
-    {
-        25 => "90px",
-        36 => "76px",
-        49 => "64px",
-        _  => "54px"  // 64
-    };
+    private int  minesGameId = 0;
+    private int? currentBetId = null;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += OnSessionChanged;
-
         var game = GameRepo.GetByName("Mines");
-        if (game != null)
-            minesGameId = game.Id;
+        if (game != null) minesGameId = game.Id;
     }
+
     private void OnSessionChanged() => InvokeAsync(StateHasChanged);
     public void Dispose()           => Session.OnChange -= OnSessionChanged;
 
-    private int minesGameId = 0;
-    private int? currentBetId = null;
-
-    // ── Configurare ───────────────────────────────────────────────────────
-    private void SetGridSize(int gs)
-    {
-        gridSize  = gs;
-        mineCount = Math.Min(mineCount, MaxMines);
-    }
-
-    // ── Jetoane ───────────────────────────────────────────────────────────
+    // ── Betting ───────────────────────────────────────────────────────────
     private void AddChip(int v)
     {
-        decimal newBet = Math.Min(currentBet + v, MaxBet);
-        if (Session.CurrentPlayer!.Balance < (double)newBet)
-        { errorMsg = "Balanta insuficienta!"; return; }
-        errorMsg = "";
-        currentBet = newBet;
+        MN.AddChip(v, Session.CurrentPlayer!.Balance, out string? err);
+        errorMsg = err ?? "";
     }
 
-    private void ClearBet()  { currentBet = 0; errorMsg = ""; }
-    private void HalfBet()   { currentBet = Math.Max(1, Math.Floor(currentBet / 2)); errorMsg = ""; }
+    private void HalfBet()   { MN.HalfBet();   errorMsg = ""; }
+
     private void DoubleBet()
     {
-        decimal doubled = Math.Min(currentBet * 2, MaxBet);
-        if (Session.CurrentPlayer!.Balance < (double)doubled)
-        { errorMsg = "Balanta insuficienta pentru dublare!"; return; }
-        errorMsg = "";
-        currentBet = doubled;
-    }
-    private void Rebet()
-    {
-        if (Session.CurrentPlayer!.Balance < (double)lastBet) return;
-        currentBet = lastBet;
-        errorMsg   = "";
+        MN.DoubleBet(Session.CurrentPlayer!.Balance, out string? err);
+        errorMsg = err ?? "";
     }
 
-    private bool CanStart() =>
-        currentBet > 0 &&
-        Session.CurrentPlayer!.Balance >= (double)currentBet;
+    private void Rebet()
+    {
+        MN.Rebet(Session.CurrentPlayer!.Balance);
+        errorMsg = "";
+    }
 
     // ── START ─────────────────────────────────────────────────────────────
     private void StartGame()
     {
-        if (!CanStart()) return;
+        if (!MN.CanStart(Session.CurrentPlayer!.Balance)) return;
 
-        // Deduce pariul
-        var newBal = Session.CurrentPlayer!.Balance - (double)currentBet;
+        var result = MN.StartGame(Session.CurrentPlayer.Balance);
+
         currentBetId = BetRepo.Create(new Bet
         {
-            PlayerId = Session.CurrentPlayer.Id,
-            GameId = minesGameId,
+            PlayerId  = Session.CurrentPlayer.Id,
+            GameId    = minesGameId,
             SessionId = null,
-            Amount = (double)currentBet,
-            Status = "Pending"
+            Amount    = (double)result.BetAmount,
+            Status    = "Pending"
         });
-        Session.UpdateBalance(newBal);
-        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+        Session.UpdateBalance(result.BalanceAfterBet);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, result.BalanceAfterBet);
 
-        // Plaseaza minele aleatoriu
-        var rng  = new Random();
-        mineSet  = new HashSet<int>();
-        while (mineSet.Count < mineCount)
-            mineSet.Add(rng.Next(gridSize));
-
-        cells            = new CellState[gridSize]; // toate Hidden (default)
-        cellMultipliers  = new();
-        safeRevealed     = 0;
-        currentMultiplier = 1.0;
-        cashOutWin       = 0;
-        errorMsg         = "";
-        gameState        = GameState.Playing;
+        errorMsg = "";
         roundKey++;
     }
 
-    // ── REVEAL CELULA ─────────────────────────────────────────────────────
+    // ── REVEAL ────────────────────────────────────────────────────────────
     private void RevealCell(int idx)
     {
-        if (gameState != GameState.Playing) return;
-        if (cells[idx] != CellState.Hidden) return;
+        var result = MN.RevealCell(idx, Session.CurrentPlayer!.Balance);
 
-        if (mineSet.Contains(idx))
+        if (result.HitMine)
         {
-            cells[idx] = CellState.MineBoom;
-            RevealAllMines();
-            RevealAllSafes();
-            gameState = GameState.GameOver;
-
             if (currentBetId.HasValue)
             {
-                BetRepo.UpdateStatus(currentBetId.Value, "Lost");
+                BetRepo.UpdateStatus(currentBetId.Value, result.BetStatus);
                 currentBetId = null;
             }
         }
-        else
+        else if (result.AutoCashOut)
         {
-            safeRevealed++;
-            currentMultiplier = GetMultiplier(gridSize, mineCount, safeRevealed);
-            cellMultipliers[idx] = currentMultiplier;
-            cells[idx] = CellState.Safe;
-
-            // Daca a dezvaluit toate celulele sigure — auto cashout
-            if (safeRevealed == gridSize - mineCount)
-                CashOut();
+            Session.UpdateBalance(result.NewBalance);
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer!.Id, result.NewBalance);
+            if (currentBetId.HasValue)
+            {
+                BetRepo.UpdateStatus(currentBetId.Value, result.BetStatus);
+                currentBetId = null;
+            }
         }
     }
 
     // ── CASH OUT ──────────────────────────────────────────────────────────
     private void CashOut()
     {
-        if (gameState != GameState.Playing || safeRevealed == 0) return;
+        var result = MN.CashOut(Session.CurrentPlayer!.Balance);
+        if (result.CashOutWin <= 0) return;
 
-        cashOutWin = Math.Round(currentBet * (decimal)currentMultiplier, 2);
-        var newBal = Session.CurrentPlayer!.Balance + (double)cashOutWin;
-        Session.UpdateBalance(newBal);
-        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+        Session.UpdateBalance(result.NewBalance);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, result.NewBalance);
         if (currentBetId.HasValue)
         {
             BetRepo.UpdateStatus(currentBetId.Value, "Won");
             currentBetId = null;
         }
-
-        lastBet   = currentBet;
-        currentBet = 0;
-
-        // Dezvaluie restul
-        RevealAllMines();
-        RevealAllSafes();
-        gameState = GameState.CashedOut;
-    }
-
-    // ── REVEAL HELPERS ────────────────────────────────────────────────────
-    private void RevealAllMines()
-    {
-        for (int i = 0; i < gridSize; i++)
-            if (mineSet.Contains(i) && cells[i] == CellState.Hidden)
-                cells[i] = CellState.Mine;
-    }
-
-    private void RevealAllSafes()
-    {
-        for (int i = 0; i < gridSize; i++)
-            if (!mineSet.Contains(i) && cells[i] == CellState.Hidden)
-                cells[i] = CellState.SafeUnrevealed;
     }
 
     // ── ROUND NOU ─────────────────────────────────────────────────────────
@@ -461,62 +359,10 @@
     {
         isResetting = true;
         await Task.Delay(300);
-        cells            = Array.Empty<CellState>();
-        mineSet          = new();
-        cellMultipliers  = new();
-        safeRevealed     = 0;
-        currentMultiplier = 1.0;
-        cashOutWin       = 0;
-        errorMsg         = "";
-        gameState        = GameState.Idle;
-        isResetting      = false;
+        MN.NewRound();
+        errorMsg    = "";
+        isResetting = false;
     }
-
-    // ── MATEMATICA ───────────────────────────────────────────────────────
-    // Multiplier = 0.99 × C(N, K) / C(N-M, K)
-    // log ratio = sum_{i=0}^{K-1} [log(N-i) - log(N-M-i)]  (evita overflow)
-    private double GetMultiplier(int N, int M, int K)
-    {
-        if (K <= 0) return 1.0;
-        double logRatio = 0;
-        for (int i = 0; i < K; i++)
-            logRatio += Math.Log(N - i) - Math.Log(N - M - i);
-        return 0.99 * Math.Exp(logRatio);
-    }
-
-    private double GetNextMultiplier() =>
-        GetMultiplier(gridSize, mineCount, safeRevealed + 1);
-
-    // Sansa ca urmatoarea celula sa fie sigura
-    private double GetWinChance()
-    {
-        int remaining = gridSize - safeRevealed;
-        int minesLeft = mineCount; // minele nu se dezvaluie in play
-        int safesLeft = remaining - minesLeft;
-        if (remaining <= 0) return 0;
-        return 100.0 * safesLeft / remaining;
-    }
-
-    // ── HELPERS UI ────────────────────────────────────────────────────────
-    private string GetCellClass(CellState s) => s switch
-    {
-        CellState.Safe          => "cell-safe",
-        CellState.Mine          => "cell-mine",
-        CellState.MineBoom      => "cell-boom",
-        CellState.SafeUnrevealed=> "cell-safe-ghost",
-        _                       => "cell-hidden"
-    };
-
-    private string GetCellMult(int idx) =>
-        cellMultipliers.TryGetValue(idx, out double m) ? m.ToString("F2") + "×" : "";
-
-    private string GetChanceColor(double p) => p switch
-    {
-        >= 70 => "#2ecc71",
-        >= 45 => "#f39c12",
-        >= 20 => "#e67e22",
-        _      => "#e74c3c"
-    };
 }
 
 <style>
@@ -530,7 +376,6 @@
         border-radius: 0 0 8px 8px; overflow: hidden;
         position: relative;
     }
-    /* Textura subtila albastra */
     .mn-table::before {
         content:''; position:absolute; inset:0; pointer-events:none;
         background-image:
@@ -548,16 +393,12 @@
         overflow-y: auto;
     }
 
-    /* Balanta **/
     .mn-bal-box { display:flex; flex-direction:column; gap:2px; margin-bottom:4px; }
     .mn-lbl     { display:block; font-size:0.6rem; letter-spacing:3px; color:#3a4a6a; font-weight:700; text-transform:uppercase; }
     .mn-lbl-val { color:#63b3ed; font-weight:700; }
     .mn-bal-val { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; color:#D4AF37; letter-spacing:2px; }
-
-    /* Sectiune **/
     .mn-section { display:flex; flex-direction:column; gap:7px; }
 
-    /* Grid size buttons **/
     .mn-grid-btns { display:flex; gap:6px; }
     .mn-gs-btn {
         flex:1; height:36px; border-radius:6px;
@@ -570,7 +411,6 @@
     .mn-gs-btn:hover  { border-color:rgba(99,179,237,0.4); color:#63b3ed; background:rgba(99,179,237,0.07); }
     .mn-gs-btn.gs-active { background:rgba(99,179,237,0.2); border-color:#63b3ed; color:#63b3ed; box-shadow:0 0 12px rgba(99,179,237,0.3); }
 
-    /* Slider mine count **/
     .mn-slider-row { display:flex; align-items:center; gap:8px; }
     .mn-slider-min,.mn-slider-max { font-family:'Bebas Neue',sans-serif; font-size:0.85rem; color:#444; width:18px; text-align:center; }
     .mn-slider {
@@ -587,7 +427,6 @@
     .mn-slider::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:#e74c3c; border:2px solid #fff; cursor:pointer; }
     .mn-mine-info { display:flex; justify-content:space-between; font-size:0.78rem; color:#556; }
 
-    /* Pariu **/
     .mn-bet-display {
         display:flex; align-items:center; gap:6px;
         min-height:36px; padding:0 10px;
@@ -604,7 +443,6 @@
     .mn-bet-dbl:hover     { background:rgba(212,175,55,0.15); color:#D4AF37; }
     .mn-bet-dbl:disabled  { opacity:0.3; cursor:not-allowed; }
 
-    /* Chips **/
     .mn-chips-row { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; }
     .mn-chip {
         width:44px; height:44px; border-radius:50%; border:none; cursor:pointer;
@@ -631,10 +469,8 @@
     }
     .mn-clear-btn:hover { border-color:rgba(231,76,60,0.5); color:#e74c3c; }
 
-    /* Info in-game **/
     .mn-info-val { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; color:#f0e6d3; letter-spacing:1px; }
 
-    /* Multiplier box **/
     .mn-mult-box {
         padding:12px; border-radius:8px;
         background:rgba(0,0,0,0.3);
@@ -649,14 +485,11 @@
     }
     .mn-mult-val { font-family:'Bebas Neue',sans-serif; font-size:2rem; color:#D4AF37; letter-spacing:2px; line-height:1; }
     .mn-pot-win  { font-size:0.85rem; color:#2ecc71; font-weight:600; }
-
     .mn-next-box { padding:8px 12px; border-radius:6px; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; gap:2px; }
     .mn-next-val { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#63b3ed; letter-spacing:1px; }
 
-    /* Eroare **/
     .mn-error { color:#e74c3c; font-size:0.72rem; letter-spacing:0.5px; }
 
-    /* Actiuni **/
     .mn-actions { display:flex; flex-direction:column; gap:8px; }
     .mn-start, .mn-cashout, .mn-rebet {
         width:100%; padding:14px; border:none; border-radius:8px;
@@ -681,7 +514,6 @@
     .mn-rebet:hover { border-color:rgba(212,175,55,0.4); color:#D4AF37; }
     .mn-off { opacity:0.3; cursor:not-allowed !important; transform:none !important; }
 
-    /* Banner rezultat **/
     .mn-result-banner {
         display:flex; flex-direction:column; align-items:center; gap:4px;
         padding:12px; border-radius:8px; text-align:center;
@@ -702,13 +534,10 @@
         justify-content:center; gap:16px;
         padding:24px 20px 28px;
     }
-
-    /* Header joc **/
     .mn-game-header { display:flex; flex-direction:column; align-items:center; gap:4px; }
     .mn-game-title  { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:6px; color:#D4AF37; text-shadow:0 0 20px rgba(212,175,55,0.3); }
     .mn-game-sub    { font-size:0.65rem; letter-spacing:3px; color:#3a4a6a; }
 
-    /* ── GRID ─────────────────────────────────────────────────────────────── */
     .mn-grid {
         display:grid;
         grid-template-columns: repeat(var(--cols), var(--cell-size));
@@ -716,53 +545,36 @@
         gap:6px;
     }
 
-    /* ── CELULA ───────────────────────────────────────────────────────────── */
     .mn-cell {
-        width: var(--cell-size);
-        height: var(--cell-size);
-        border-radius: 10px;
-        overflow: hidden;
-        position: relative;
-        cursor: default;
+        width: var(--cell-size); height: var(--cell-size);
+        border-radius: 10px; overflow: hidden; position: relative; cursor: default;
         animation: cellAppear 0.4s cubic-bezier(0.22,1,0.36,1) both;
         animation-delay: calc(var(--i) * 8ms);
     }
-    @@keyframes cellAppear {
-        from { transform:scale(0.6); opacity:0; }
-        to   { transform:scale(1);   opacity:1; }
-    }
-
+    @@keyframes cellAppear { from{transform:scale(0.6);opacity:0;} to{transform:scale(1);opacity:1;} }
     .mn-cell-inner {
         width:100%; height:100%;
         display:flex; flex-direction:column; align-items:center; justify-content:center;
         gap:2px; border-radius:10px;
     }
-
-    /* Hidden **/
     .cell-hidden .mn-cell-inner {
         background: linear-gradient(145deg, #1e2744 0%, #151d36 100%);
         border: 1px solid rgba(99,179,237,0.1);
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(255,255,255,0.04);
     }
-    /* Puls discret pe celulele ascunse in play **/
     .cell-idle {
         background: linear-gradient(145deg, #1e2744 0%, #151d36 100%);
         border: 1px solid rgba(99,179,237,0.1);
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(255,255,255,0.04);
     }
-
-    /* Hover celule clickabile **/
     .cell-hover { cursor:pointer; }
     .cell-hover:hover .mn-cell-inner {
         background: linear-gradient(145deg, #2a3860 0%, #1e2e52 100%);
         border-color: rgba(99,179,237,0.4);
         box-shadow: 0 0 14px rgba(99,179,237,0.25), inset 0 2px 4px rgba(0,0,0,0.3);
-        transform: scale(1.04);
-        transition: all 0.1s;
+        transform: scale(1.04); transition: all 0.1s;
     }
     .cell-hover:active .mn-cell-inner { transform:scale(0.97); }
-
-    /* SAFE — gem cu glow verde **/
     .cell-safe { animation: cellAppear 0.4s cubic-bezier(0.22,1,0.36,1) both !important; }
     .gem-reveal {
         background: linear-gradient(145deg, #0d2818 0%, #0a1f12 100%);
@@ -770,58 +582,31 @@
         box-shadow: 0 0 16px rgba(46,204,113,0.3), inset 0 1px 0 rgba(46,204,113,0.2);
         animation: gemPop 0.35s cubic-bezier(0.22,1,0.36,1);
     }
-    @@keyframes gemPop {
-        from { transform:scale(0.5) rotate(-15deg); opacity:0; }
-        to   { transform:scale(1) rotate(0deg);     opacity:1; }
-    }
+    @@keyframes gemPop { from{transform:scale(0.5) rotate(-15deg);opacity:0;} to{transform:scale(1) rotate(0deg);opacity:1;} }
     .mn-gem       { font-size:1.5rem; line-height:1; filter:drop-shadow(0 0 6px rgba(46,204,113,0.8)); }
     .mn-cell-mult { font-family:'Bebas Neue',sans-serif; font-size:0.62rem; color:rgba(46,204,113,0.8); letter-spacing:1px; line-height:1; }
-
-    /* MINA dezvaluita (restul, la sfarsit) **/
     .cell-mine .mine-reveal {
         background: linear-gradient(145deg, #2a0a0a 0%, #1a0606 100%);
         border: 1px solid rgba(231,76,60,0.3);
         box-shadow: 0 0 10px rgba(231,76,60,0.2);
     }
     .mn-bomb { font-size:1.4rem; line-height:1; opacity:0.7; }
-
-    /* MINA explodata (cea click-ata) — animatie mare **/
     .cell-boom .mine-boom {
         background: linear-gradient(145deg, #3a0a0a 0%, #250606 100%);
         border: 2px solid rgba(231,76,60,0.8);
         box-shadow: 0 0 30px rgba(231,76,60,0.7), 0 0 60px rgba(231,76,60,0.3);
         animation: boomFlash 0.4s ease-out;
     }
-    @@keyframes boomFlash {
-        0%  { transform:scale(1.3); box-shadow:0 0 60px rgba(231,76,60,1); }
-        50% { transform:scale(0.9); }
-        100%{ transform:scale(1);   }
-    }
+    @@keyframes boomFlash { 0%{transform:scale(1.3);box-shadow:0 0 60px rgba(231,76,60,1);} 50%{transform:scale(0.9);} 100%{transform:scale(1);} }
     .mn-boom { font-size:1.8rem; line-height:1; animation:boomSpin 0.4s ease-out; filter:drop-shadow(0 0 12px rgba(231,76,60,0.9)); }
-    @@keyframes boomSpin {
-        from{ transform:rotate(-20deg) scale(1.5); }
-        to  { transform:rotate(0deg)  scale(1);   }
-    }
+    @@keyframes boomSpin { from{transform:rotate(-20deg) scale(1.5);} to{transform:rotate(0deg) scale(1);} }
+    .cell-safe-ghost .safe-ghost { background:rgba(0,0,0,0.3); border:1px solid rgba(46,204,113,0.12); }
 
-    /* SAFE nepickat dezvaluit la sfarsit **/
-    .cell-safe-ghost .safe-ghost {
-        background:rgba(0,0,0,0.3);
-        border:1px solid rgba(46,204,113,0.12);
-    }
-
-    /* ── WIN CHANCE BAR ───────────────────────────────────────────────────── */
-    .mn-win-chance {
-        display:flex; flex-direction:column; align-items:center; gap:5px;
-        width:100%; max-width:600px;
-    }
-    .mn-chance-bar-wrap {
-        width:100%; height:6px; border-radius:3px;
-        background:rgba(255,255,255,0.06); overflow:hidden;
-    }
+    .mn-win-chance { display:flex; flex-direction:column; align-items:center; gap:5px; width:100%; max-width:600px; }
+    .mn-chance-bar-wrap { width:100%; height:6px; border-radius:3px; background:rgba(255,255,255,0.06); overflow:hidden; }
     .mn-chance-bar { height:100%; border-radius:3px; transition:width 0.4s ease, background 0.4s ease; }
     .mn-chance-val { font-family:'Bebas Neue',sans-serif; font-size:0.9rem; letter-spacing:2px; }
 
-    /* ── RESPONSIVE ───────────────────────────────────────────────────────── */
     @@media (max-width:700px) {
         .mn-table    { flex-direction:column; }
         .mn-sidebar  { width:100%; min-width:unset; border-right:none; border-bottom:1px solid rgba(255,255,255,0.05); }

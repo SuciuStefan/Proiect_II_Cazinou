@@ -135,30 +135,30 @@
     }
 
     private async Task HandleLogin()
-{
-    if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
     {
-        loginSuccess = false;
-        loginMessage = "Completează toate câmpurile!";
-        return;
-    }
+        if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
+        {
+            loginSuccess = false;
+            loginMessage = "Completează toate câmpurile!";
+            return;
+        }
 
-    var player = PlayerRepo.GetByUsername(loginUsername);
+        var player = PlayerRepo.GetByUsername(loginUsername);
 
-    if (player != null && player.Password == loginPassword)
-    {
-        Session.SetPlayer(player);
-        await Storage.SetAsync("playerId", player.Id); //salveaza ID-ul criptat
-        loginSuccess = true;
-        loginMessage = "Autentificare reușită!";
-        NavManager.NavigateTo("/Home");
+        if (player != null && player.Password == loginPassword)
+        {
+            Session.SetPlayer(player);
+            await Storage.SetAsync("playerId", player.Id); //salveaza ID-ul criptat
+            loginSuccess = true;
+            loginMessage = "Autentificare reușită!";
+            NavManager.NavigateTo("/Home");
+        }
+        else
+        {
+            loginSuccess = false;
+            loginMessage = "Utilizator sau parolă greșite.";
+        }
     }
-    else
-    {
-        loginSuccess = false;
-        loginMessage = "Utilizator sau parolă greșite.";
-    }
-}
 
     private void HandleRegister()
     {
@@ -230,15 +230,15 @@
         regMessage = "A apărut o eroare la salvarea datelor.";
     }
     //Cica e bun acest catch in caz ca undeva cumva ar da 2 useri creare cont cu acelasi nume sau email,
-    //exact in acelasi timp, sa nu puste, da eroarea aia. Nu stiu daca e neaparat nevoie, dar am pus, se
-    //poate scoate daca incurca.
+    //exact in acelasi timp, sa nu puste, da eroarea aia. Nu stiu daca e neaparat nevoie, dar am pus 
+    //se poate scoate daca incurca.
     }
     
 
-private void GoToForgotPassword()
-{
-    NavManager.NavigateTo("/ForgotPassword");
-}
+    private void GoToForgotPassword()
+    {
+        NavManager.NavigateTo("/ForgotPassword");
+    }
 
 }
 
@@ -587,16 +587,5 @@ private void GoToForgotPassword()
         background: var(--gold);
         color: var(--black);
         box-shadow: 0 4px 20px rgba(212,175,55,0.4);
-    }
-
-    /* ─── RESPONSIVE ─── *
-
-    @@media (max-width: 640px) {
-        .container { min-height: 100vh; border-radius: 0; }
-        .overlay-container { display: none; }
-        .form-container { width: 100%; }
-        .sign-up-container { display: none; }
-        .right-panel-active .sign-up-container { display: flex; transform: none; }
-        .right-panel-active .sign-in-container { display: none; }
     }
 </style>

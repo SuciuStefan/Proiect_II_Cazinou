@@ -1,6 +1,8 @@
 @using CasinoApp.DataAccess.DB_operations
 @using CasinoApp.DataAccess.Entities
+@using CasinoApp.BusinessLogic.Services
 @inject CasinoApp.Web.Services.SessionService Session
+@inject IFlipACoinService FC
 @inject PlayerRepository PlayerRepo
 @inject BetRepository BetRepo
 @inject GameRepository GameRepo
@@ -40,7 +42,7 @@
     @* ── REZULTAT BANNER ──────────────────────────────────────────────────── *@
     @if (gameState == GameState.Result)
     {
-        <div class="fc-result @GetResultClass()">
+        <div class="fc-result @FC.GetResultClass(resultWin)">
             <span class="fc-res-msg">@resultMsg</span>
             @if (resultWin != 0)
             {
@@ -50,7 +52,6 @@
     }
     else
     {
-        @* spatiu rezervat sa nu sarite layout-ul *@
         <div class="fc-result-placeholder"></div>
     }
 
@@ -59,14 +60,14 @@
     {
         <div class="fc-choice-row">
             <button class="fc-choice-btn @(playerChoice == "heads" ? "chosen" : "")"
-                    @onclick='()=>PickChoice("heads")'
+                    @onclick='() => PickChoice("heads")'
                     disabled="@isResetting">
                 <span class="fc-choice-icon">★</span>
                 <span class="fc-choice-lbl">HEADS</span>
             </button>
             <span class="fc-choice-vs">VS</span>
             <button class="fc-choice-btn @(playerChoice == "tails" ? "chosen" : "")"
-                    @onclick='()=>PickChoice("tails")'
+                    @onclick='() => PickChoice("tails")'
                     disabled="@isResetting">
                 <span class="fc-choice-icon">◈</span>
                 <span class="fc-choice-lbl">TAILS</span>
@@ -81,20 +82,27 @@
     @* ── SIDEBAR DREAPTA ──────────────────────────────────────────────────── *@
     <div class="fc-sidebar">
 
-        @* Balanta *@
         <div class="fc-bal">
             <span class="fc-bal-lbl">BALANTA</span>
             <span class="fc-bal-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
         </div>
 
-        @* Butoane STERGE/REBET/FLIP — la bet si result *@
         @if (gameState == GameState.Betting || gameState == GameState.Result)
         {
             <div class="fc-sidebar-actions">
-                <button class="fc-ctrl clear" @onclick="ClearBet" disabled="@(currentBet == 0 || isResetting)"> @(isStreak ? "💰 ÎNCASEAZĂ" : "✕ STERGE")</button>
-                <button class="fc-ctrl rebet" @onclick="Rebet" disabled="@(lastBet == 0 || Session.CurrentPlayer!.Balance < (double)lastBet || isResetting || isStreak)">↺ REBET (@lastBet.ToString("0") RON)</button>
+                <button class="fc-ctrl clear"
+                        @onclick="ClearBet"
+                        disabled="@(FC.CurrentBet == 0 || isResetting)">
+                    @(FC.IsStreak ? "💰 ÎNCASEAZĂ" : "✕ STERGE")
+                </button>
+                <button class="fc-ctrl rebet"
+                        @onclick="Rebet"
+                        disabled="@(FC.LastBet == 0 || Session.CurrentPlayer!.Balance < (double)FC.LastBet || isResetting || FC.IsStreak)">
+                    ↺ REBET (@FC.LastBet.ToString("0") RON)
+                </button>
                 <button class="fc-flip @(CanFlip() ? "" : "flip-off")"
-                        @onclick="Flip" disabled="@(!CanFlip())">
+                        @onclick="Flip"
+                        disabled="@(!CanFlip())">
                     FLIP!
                 </button>
             </div>
@@ -111,11 +119,10 @@
     {
         <div class="fc-bet-panel">
 
-            @* Stiva jetoane plasate *@
             <div class="fc-chip-stack-wrap">
-                @if (currentBet > 0 && !isResetting)
+                @if (FC.CurrentBet > 0 && !isResetting)
                 {
-                    var columns = GetChipColumns((int)currentBet);
+                    var columns = FC.GetChipColumns((int)FC.CurrentBet);
                     <div class="fc-chip-cols">
                         @foreach (var col in columns)
                         {
@@ -127,7 +134,7 @@
                             </div>
                         }
                     </div>
-                    <div class="bet-total">@currentBet RON</div>
+                    <div class="bet-total">@FC.CurrentBet RON</div>
                 }
                 else
                 {
@@ -135,7 +142,6 @@
                 }
             </div>
 
-            @* Rand jetoane de selectat *@
             <div class="fc-chips-row">
                 @foreach (var cv in chipDenoms)
                 {
@@ -158,37 +164,28 @@
 
     private enum GameState { Betting, Flipping, Result }
 
-    // ── Stare joc ──────────────────────────────────────────────────────────
+    // ── UI-only state ─────────────────────────────────────────────────────
+    private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
+
     private GameState gameState   = GameState.Betting;
-    private string    playerChoice = "";    // "heads" sau "tails"
-    private string    coinResult   = "";    // "heads" sau "tails" — tras la sorti
-    private string    coinClass    = "idle";// clasa CSS pe moneda
+    private string    playerChoice = "";
+    private string    coinClass    = "idle";
     private string    resultMsg    = "";
     private decimal   resultWin    = 0;
     private bool      isResetting  = false;
     private string    errorMsg     = "";
-    private bool isStreak = false; // Marchează dacă jetoanele de pe masă sunt dintr-un dublaj
 
-    // ── Pariu ──────────────────────────────────────────────────────────────
-    private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
-    private decimal currentBet = 0;
-    private decimal lastBet    = 0;
-
-    private int flipGameId = 0;
+    private int  flipGameId  = 0;
     private int? currentBetId = null;
 
-    // ── CancellationToken — safe dispose ───────────────────────────────────
     private CancellationTokenSource? _resetCts;
-    private readonly Random          _rng = new();
 
-    // ── Lifecycle ──────────────────────────────────────────────────────────
+    // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += OnSessionChanged;
-
         var game = GameRepo.GetByName("Flip a Coin");
-        if (game != null)
-            flipGameId = game.Id;
+        if (game != null) flipGameId = game.Id;
     }
 
     private void OnSessionChanged() => InvokeAsync(StateHasChanged);
@@ -200,7 +197,7 @@
         _resetCts?.Dispose();
     }
 
-    // ── Alegere cap/pajura ─────────────────────────────────────────────────
+    // ── Player choice (UI-only, lives here not in service) ────────────────
     private void PickChoice(string choice)
     {
         if (isResetting) return;
@@ -208,141 +205,104 @@
         errorMsg = "";
     }
 
-    // ── Jetoane ────────────────────────────────────────────────────────────
+    // ── Betting ───────────────────────────────────────────────────────────
     private void AddChip(int v)
     {
         if (isResetting) return;
-        if (isStreak)
-        {
-            errorMsg = "Ești pe dublaj! Dă FLIP sau apasă pe încasare.";
-            return;
-        }
-        if (Session.CurrentPlayer!.Balance < (double)(currentBet + v))
-        { errorMsg = "Balanta insuficienta!"; return; }
-    
-        errorMsg = "";
-        currentBet += v;
+        FC.AddChip(v, Session.CurrentPlayer!.Balance, out string? err);
+        errorMsg = err ?? "";
     }
 
     private void ClearBet()
-{
-    if (isResetting) return;
-
-    if (isStreak)
     {
-        // Jucătorul decide să se oprească și încasează banii de pe masă înapoi în cont
-        var newBal = Session.CurrentPlayer!.Balance + (double)currentBet;
-        Session.UpdateBalance(newBal);
-        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+        if (isResetting) return;
+
+        if (FC.IsStreak)
+        {
+            // Player collecting streak winnings manually
+            var collected = FC.CollectStreak(Session.CurrentPlayer!.Balance);
+            Session.UpdateBalance(collected.NewBalance);
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, collected.NewBalance);
             if (currentBetId.HasValue)
             {
-                BetRepo.UpdateStatus(currentBetId.Value, "Won");
+                BetRepo.UpdateStatus(currentBetId.Value, collected.BetStatus);
                 currentBetId = null;
             }
-        isStreak = false;
-    }
+        }
+        else
+        {
+            FC.ClearBet();
+        }
 
-    currentBet = 0; 
-    errorMsg = "";
-}
+        errorMsg = "";
+    }
 
     private void Rebet()
     {
-        if (isResetting || isStreak) return; // Fără rebet peste streak
-        if (Session.CurrentPlayer!.Balance < (double)lastBet) return;
-        currentBet = lastBet; errorMsg = "";
+        FC.Rebet(Session.CurrentPlayer!.Balance, out string? err);
+        errorMsg = err ?? "";
     }
 
     private bool CanFlip() =>
-    !isResetting &&
-    currentBet > 0 &&
-    !string.IsNullOrEmpty(playerChoice) &&
-    (isStreak || Session.CurrentPlayer!.Balance >= (double)currentBet); // Validăm balanța doar dacă NU e un streak
+        !isResetting &&
+        !string.IsNullOrEmpty(playerChoice) &&
+        FC.CanFlip(Session.CurrentPlayer!.Balance);
 
-    // ── FLIP ───────────────────────────────────────────────────────────────
+    // ── FLIP ──────────────────────────────────────────────────────────────
     private async Task Flip()
     {
         if (!CanFlip()) return;
 
-        // 1. Deducerea banilor: O facem DOAR dacă este un pariu nou
-        if (!isStreak)
+        // Deduct bet from balance only on a fresh flip (not a streak continuation)
+        if (!FC.IsStreak)
         {
-            var balAfterBet = Session.CurrentPlayer!.Balance - (double)currentBet;
+            var balAfterBet = Session.CurrentPlayer!.Balance - (double)FC.CurrentBet;
             Session.UpdateBalance(balAfterBet);
             PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
 
             currentBetId = BetRepo.Create(new Bet
             {
-                PlayerId = Session.CurrentPlayer.Id,
-                GameId = flipGameId,
+                PlayerId  = Session.CurrentPlayer.Id,
+                GameId    = flipGameId,
                 SessionId = null,
-                Amount = (double)currentBet,
-                Status = "Pending"
+                Amount    = (double)FC.CurrentBet,
+                Status    = "Pending"
             });
         }
 
-        gameState   = GameState.Flipping;
-        coinResult  = _rng.Next(2) == 0 ? "heads" : "tails";
-        bool won    = coinResult == playerChoice;
+        gameState = GameState.Flipping;
 
-        coinClass = coinResult == "heads" ? "flip-to-heads" : "flip-to-tails";
+        // Set animation class (flip-to-heads / flip-to-tails) — we need the coin
+        // result now to pick the right animation, but we get it from the service.
+        // Run the flip logic first, then animate.
+        var result = FC.Flip(Session.CurrentPlayer!.Balance, playerChoice);
+
+        // Start animation matching the result
+        coinClass = result.CoinResult == "heads" ? "flip-to-heads" : "flip-to-tails";
         await InvokeAsync(StateHasChanged);
-        await Task.Delay(2650);
+        await Task.Delay(2650); // matches CSS animation duration
 
-        coinClass = coinResult == "heads" ? "show-heads" : "show-tails";
+        // Land the coin
+        coinClass = result.CoinClass;
 
-        // 2. Calcul Rezultat și Acumulator
-        if (won)
+        // Apply DB updates based on what the service decided
+        if (result.ShouldCreditWin)
         {
-            var winAmt = Math.Round(currentBet, 2);
-            resultMsg  = coinResult == "heads" ? "★ HEADS — AI CASTIGAT! ★" : "◈ TAILS — AI CASTIGAT! ◈";
-            resultWin  = winAmt; // Afișăm profitul pe tura curentă
-
-            decimal doubledPot = currentBet * 2;
-
-            // Dacă a depășit sau atins 10.000 RON, resetăm la 0 jetoane și virăm banii direct în cont
-            if (doubledPot >= 10000m)
-            {
-                var newBal = Session.CurrentPlayer!.Balance + (double)doubledPot;
-                Session.UpdateBalance(newBal);
-                PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
-                if (currentBetId.HasValue)
-                {
-                    BetRepo.UpdateStatus(currentBetId.Value, "Won");
-                    currentBetId = null;
-                }
-
-                resultMsg += " LIMITĂ ATINSĂ!";
-                lastBet = currentBet;
-                currentBet = 0;
-                isStreak = false;
-            }
-            else
-            {
-                // Lasă jetoanele active (dublate) pe masă pentru a forța continuarea dublajului
-                lastBet = currentBet;
-                currentBet = doubledPot;
-                isStreak = true;
-            }
-        }
-        else
-        {
-            // A pierdut -> totul se resetează
-            resultMsg = coinResult == "heads" ? "HEADS — AI PIERDUT" : "TAILS — AI PIERDUT";
-            resultWin = -currentBet;
-
-            lastBet = currentBet;
-            currentBet = 0;
-            isStreak = false; 
-
-            if (currentBetId.HasValue)
-            {
-                BetRepo.UpdateStatus(currentBetId.Value, "Lost");
-                currentBetId = null;
-            }
+            // Limit reached — auto-collect doubled pot
+            var newBal = Session.CurrentPlayer!.Balance + result.CreditAmount;
+            Session.UpdateBalance(newBal);
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
         }
 
-        gameState  = GameState.Result;
+        if (currentBetId.HasValue && result.BetStatus != "Pending")
+        {
+            BetRepo.UpdateStatus(currentBetId.Value, result.BetStatus);
+            currentBetId = null;
+        }
+
+        resultMsg = result.ResultMsg;
+        resultWin = result.ResultWin;
+        gameState = GameState.Result;
         isResetting = true;
 
         await InvokeAsync(StateHasChanged);
@@ -364,36 +324,11 @@
             coinClass   = "idle";
             isResetting = false;
             gameState   = GameState.Betting;
-            // Pastreaza playerChoice ca sa poata face rebet rapid
-            // currentBet deja 0
+            // playerChoice intentionally kept so player can streak fast
 
             await InvokeAsync(StateHasChanged);
         }
         catch (OperationCanceledException) { }
-    }
-
-    // ── CSS result class ───────────────────────────────────────────────────
-    private string GetResultClass() => resultWin > 0 ? "fc-res-win" : "fc-res-lose";
-
-    // ── Chip stack helper ──────────────────────────────────────────────────
-    private List<List<int>> GetChipColumns(int amount)
-    {
-        var columns   = new List<List<int>>();
-        int remaining = amount;
-        foreach (var d in new[] { 100, 50, 25, 10, 5, 1 })
-        {
-            if (remaining <= 0 || columns.Count >= 10) break;
-            int count = remaining / d;
-            if (count == 0) continue;
-            remaining -= count * d;
-            while (count > 0 && columns.Count < 10)
-            {
-                int take = Math.Min(count, 10);
-                columns.Add(Enumerable.Repeat(d, take).ToList());
-                count -= take;
-            }
-        }
-        return columns;
     }
 }
 
@@ -408,7 +343,6 @@
             #0d0d1f 0%, #070714 60%, #030309 100%);
         border-radius: 0 0 8px 8px; overflow: hidden;
     }
-    /* Textura subtila */
     .fc-table::before {
         content: ''; position: absolute; inset: 0; pointer-events: none;
         background-image:
@@ -429,8 +363,6 @@
         margin: 10px auto 6px;
         display: flex; align-items: center; justify-content: center;
     }
-
-    /* Umbra pe masa */
     .fc-coin-shadow {
         position: absolute;
         bottom: -12px; left: 50%; transform: translateX(-50%);
@@ -439,8 +371,6 @@
         border-radius: 50%;
         transition: all 0.3s;
     }
-
-    /* Moneda 3D */
     .fc-coin {
         width: 140px; height: 140px;
         transform-style: preserve-3d;
@@ -448,18 +378,14 @@
         transform: rotateY(0deg);
         cursor: default;
     }
-
-    /* Animatie spre HEADS — 5 rotatii complete (1800°) → aterizeaza pe fata (0°) */
     @@keyframes flipToHeads {
         0%   { transform: rotateY(0deg); }
         100% { transform: rotateY(1800deg); }
     }
-    /* Animatie spre TAILS — 5 rotatii + jumatate (1980°) → aterizeaza pe spate (180°) */
     @@keyframes flipToTails {
         0%   { transform: rotateY(0deg); }
         100% { transform: rotateY(1980deg); }
     }
-    /* Miscare verticala (saritura) sincronizata cu rotatia */
     @@keyframes coinBounce {
         0%   { margin-top: 0; }
         20%  { margin-top: -60px; }
@@ -468,7 +394,6 @@
         85%  { margin-top: -10px; }
         100% { margin-top: 0; }
     }
-
     .fc-coin.flip-to-heads {
         animation:
             flipToHeads 2.6s cubic-bezier(0.22, 0.8, 0.5, 1) forwards,
@@ -483,7 +408,6 @@
     .fc-coin.show-tails { transform: rotateY(180deg); }
     .fc-coin.idle       { transform: rotateY(0deg); transition: transform 0.4s ease; }
 
-    /* Fete moneda */
     .fc-face {
         position: absolute; inset: 0;
         width: 140px; height: 140px;
@@ -506,8 +430,6 @@
             #e8e8e8 0%, #c0c0c0 40%, #909090 70%, #606060 100%);
         transform: rotateY(180deg);
     }
-
-    /* Inel interior (efect relief) */
     .fc-face-ring {
         position: absolute; inset: 10px;
         border-radius: 50%;
@@ -515,8 +437,6 @@
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
         pointer-events: none;
     }
-
-    /* Continut fata */
     .fc-face-inner {
         display: flex; flex-direction: column; align-items: center; gap: 2px;
         z-index: 1;
@@ -584,7 +504,6 @@
     .fc-choice-icon { font-size: 1.6rem; line-height: 1; }
     .fc-choice-lbl  { font-size: 0.9rem; letter-spacing: 3px; }
 
-    /* Label "Se arunca moneda" */
     .fc-flipping-lbl {
         font-family: 'Bebas Neue', sans-serif;
         font-size: 1.1rem; letter-spacing: 4px;
@@ -607,7 +526,6 @@
     .fc-sidebar-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
     .fc-error    { color: #e74c3c; font-size: 0.75rem; text-align: right; }
 
-    /* Butoane STERGE / REBET / FLIP */
     .fc-ctrl, .fc-flip {
         width: 120px; height: 44px; border-radius: 6px;
         font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 2px;
@@ -635,7 +553,7 @@
     }
     .fc-flip.flip-off { opacity: 0.3; cursor: not-allowed; background: #333; box-shadow: none; }
 
-    /* ── PANEL PARIURI (identic cu BJ) ───────────────────────────────────── */
+    /* ── PANEL PARIURI ───────────────────────────────────────────────────── */
     .fc-bet-panel {
         display: flex; flex-direction: column; align-items: center; gap: 14px;
         width: 100%; max-width: 620px;

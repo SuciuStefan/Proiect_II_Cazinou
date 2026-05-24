@@ -1,6 +1,8 @@
 @using CasinoApp.DataAccess.DB_operations
 @using CasinoApp.DataAccess.Entities
+@using CasinoApp.BusinessLogic.Services
 @inject CasinoApp.Web.Services.SessionService Session
+@inject IBarbutService BB
 @inject PlayerRepository PlayerRepo
 @inject BetRepository BetRepo
 @inject GameRepository GameRepo
@@ -25,29 +27,29 @@
         <div class="bb-arena">
 
             @* Player Card *@
-            <div class="bb-player-card bb-you @(showResult ? GetPlayerCardClass() : "")">
+            <div class="bb-player-card bb-you @(showResult ? BB.GetPlayerCardClass() : "")">
                 <div class="bb-card-header">
                     <span class="bb-card-avatar">👤</span>
                     <span class="bb-card-name">TU</span>
                     @if (showResult)
                     {
-                        <span class="bb-card-sum @GetPlayerSumClass()">@playerSum</span>
+                        <span class="bb-card-sum @BB.GetPlayerSumClass()">@BB.PlayerSum</span>
                     }
                 </div>
                 <div class="bb-dice-tray">
                     @for (int i = 0; i < diceCount; i++)
                     {
                         int idx = i;
-                        int val = (showResult && playerDice.Length > idx) ? playerDice[idx] : 0;
+                        int val = (showResult && BB.PlayerDice.Length > idx) ? BB.PlayerDice[idx] : 0;
                         <div id="die-p-@idx"
                              class="bb-die @(showResult && val > 0 ? "die-pop" : "")">
                             @if (isRolling)
                             {
-                                @* Gol — JS injecteaza innerHTML cu dots reale *@
+                                @* empty — JS animates this *@
                             }
                             else if (val > 0)
                             {
-                                @((MarkupString)BuildDieDots(val))
+                                @((MarkupString)BB.BuildDieDots(val))
                             }
                             else
                             {
@@ -70,30 +72,30 @@
                 @for (int ai = 0; ai < 3; ai++)
                 {
                     int aiIdx = ai;
-                    <div class="bb-player-card bb-ai-card @(showResult ? GetAICardClass(aiIdx) : "")">
+                    <div class="bb-player-card bb-ai-card @(showResult ? BB.GetAICardClass(aiIdx) : "")">
                         <div class="bb-card-header">
-                            <span class="bb-card-avatar">@aiAvatars[aiIdx]</span>
-                            <span class="bb-card-name">@aiNames[aiIdx]</span>
+                            <span class="bb-card-avatar">@BB.AIAvatars[aiIdx]</span>
+                            <span class="bb-card-name">@BB.AINames[aiIdx]</span>
                             @if (showResult)
                             {
-                                <span class="bb-card-sum @GetAISumClass(aiIdx)">@aiSums[aiIdx]</span>
+                                <span class="bb-card-sum @BB.GetAISumClass(aiIdx)">@BB.AISums[aiIdx]</span>
                             }
                         </div>
                         <div class="bb-dice-tray bb-dice-tray-sm">
                             @for (int d = 0; d < diceCount; d++)
                             {
                                 int dIdx = d;
-                                int val = (showResult && aiDice[aiIdx] != null && aiDice[aiIdx].Length > dIdx)
-                                          ? aiDice[aiIdx][dIdx] : 0;
+                                int val = (showResult && BB.AIDice[aiIdx] != null && BB.AIDice[aiIdx].Length > dIdx)
+                                          ? BB.AIDice[aiIdx][dIdx] : 0;
                                 <div id="die-ai-@aiIdx-@dIdx"
                                      class="bb-die bb-die-sm @(showResult && val > 0 ? "die-pop" : "")">
                                     @if (isRolling)
                                     {
-                                        @* Gol — JS injecteaza innerHTML cu dots reale *@
+                                        @* empty — JS animates this *@
                                     }
                                     else if (val > 0)
                                     {
-                                        @((MarkupString)BuildDieDots(val))
+                                        @((MarkupString)BB.BuildDieDots(val))
                                     }
                                     else
                                     {
@@ -104,8 +106,8 @@
                         </div>
                         @if (showResult)
                         {
-                            <div class="bb-ai-verdict @GetAIVerdictClass(aiIdx)">
-                                @GetAIVerdictText(aiIdx)
+                            <div class="bb-ai-verdict @BB.GetAIVerdictClass(aiIdx)">
+                                @BB.GetAIVerdictText(aiIdx)
                             </div>
                         }
                     </div>
@@ -122,7 +124,7 @@
                 <span class="bb-balance-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
             </div>
 
-            @* Selector zaruri *@
+            @* Dice count selector *@
             <div class="bb-info-box">
                 <span class="bb-lbl">NUMĂR ZARURI</span>
                 <div class="bb-dice-selector">
@@ -139,7 +141,7 @@
                 </div>
             </div>
 
-            @* Pariu *@
+            @* Current bet *@
             <div class="bb-info-box">
                 <span class="bb-lbl">PARIU CURENT</span>
                 <span class="bb-total-val">@betAmount RON</span>
@@ -161,7 +163,7 @@
                 </div>
             </div>
 
-            @* Actiuni pariu — S-a sters butonul de adauga, ramane doar clear *@
+            @* Clear bet *@
             <div class="bb-bet-actions">
                 <button class="bb-clear-btn" @onclick="ClearBet"
                         disabled="@(isRolling || betAmount == 0)">
@@ -169,22 +171,22 @@
                 </button>
             </div>
 
-            @* Rezultat *@
+            @* Result box *@
             @if (showResult)
             {
-                string wc = netGain > 0 ? "wb-win" : netGain == 0 ? "wb-push" : "wb-lose";
+                string wc = BB.NetGain > 0 ? "wb-win" : BB.NetGain == 0 ? "wb-push" : "wb-lose";
                 <div class="bb-win-box @wc">
-                    @if (netGain > 0)
+                    @if (BB.NetGain > 0)
                     {
-                        <span>🎉 +@netGain.ToString("F2") RON</span>
+                        <span>🎉 +@BB.NetGain.ToString("F2") RON</span>
                     }
-                    else if (netGain == 0)
+                    else if (BB.NetGain == 0)
                     {
                         <span>🤝 REMIZĂ — PARIUL ÎNAPOI</span>
                     }
                     else
                     {
-                        <span>😔 -@Math.Abs(netGain).ToString("F2") RON</span>
+                        <span>😔 -@Math.Abs(BB.NetGain).ToString("F2") RON</span>
                     }
                 </div>
             }
@@ -244,7 +246,7 @@
 window.barbutGame = (function () {
 
     var dotnet    = null;
-    var intervals = {};   // id -> intervalId
+    var intervals = {};
 
     var dotHTML = {
         1: "<span class='dot dot-mc'></span>",
@@ -255,22 +257,16 @@ window.barbutGame = (function () {
         6: "<span class='dot dot-tl'></span><span class='dot dot-tr'></span><span class='dot dot-ml'></span><span class='dot dot-mr'></span><span class='dot dot-bl'></span><span class='dot dot-br'></span>"
     };
 
-    function init(ref) {
-        dotnet = ref;
-    }
+    function init(ref) { dotnet = ref; }
 
     function roll(diceCount, playerVals, aiVals) {
-        for (var ai = 0; ai < 3; ai++) {
-            for (var d = 0; d < diceCount; d++) {
+        for (var ai = 0; ai < 3; ai++)
+            for (var d = 0; d < diceCount; d++)
                 startSpin('die-ai-' + ai + '-' + d);
-            }
-        }
-        for (var p = 0; p < diceCount; p++) {
+        for (var p = 0; p < diceCount; p++)
             startSpin('die-p-' + p);
-        }
 
         var aiStops = [900, 1400, 1900];
-
         for (var ai2 = 0; ai2 < 3; ai2++) {
             (function(aiIdx) {
                 setTimeout(function() {
@@ -304,7 +300,6 @@ window.barbutGame = (function () {
         var el = document.getElementById(id);
         if (!el) return;
         el.classList.add('die-spinning');
-
         intervals[id] = setInterval(function() {
             el.innerHTML = dotHTML[Math.floor(Math.random() * 6) + 1];
         }, 40);
@@ -313,17 +308,12 @@ window.barbutGame = (function () {
     function stopSpin(id, finalVal) {
         clearInterval(intervals[id]);
         intervals[id] = null;
-
         var el = document.getElementById(id);
         if (!el) return;
-
         el.innerHTML = dotHTML[finalVal];
         el.classList.remove('die-spinning');
         el.classList.add('die-stopping');
-
-        setTimeout(function() {
-            el.classList.remove('die-stopping');
-        }, 380);
+        setTimeout(function() { el.classList.remove('die-stopping'); }, 380);
     }
 
     return { init: init, roll: roll };
@@ -332,24 +322,8 @@ window.barbutGame = (function () {
 
 @code {
 
-    private static readonly string[] namePool =
-    {
-        "Andrei", "Mihai", "Ion", "Alexandru", "Bogdan",
-        "Cristian", "Daniel", "Eduard", "Florin", "George",
-        "Horia", "Ionuț", "Liviu", "Marcel", "Nicolae",
-        "Octavian", "Pavel", "Radu", "Silviu", "Tudor",
-        "Valentin", "Victor", "Vlad", "Cătălin", "Călin",
-        "Dragoș", "Lucian", "Marian", "Sorin", "Cosmin"
-    };
-
-    private static readonly string[] avatarPool =
-    {
-        "🎭", "🤠", "😈", "🥸", "😎", "🤑", "🧠", "👹",
-        "🤡", "😤", "🫡", "🥷", "🤯", "😏", "💀"
-    };
-
-    private string[] aiNames   = new string[3];
-    private string[] aiAvatars = new string[3];
+    // ── UI-only state ─────────────────────────────────────────────────────
+    private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
 
     private int    diceCount    = 2;
     private int    selectedChip = 5;
@@ -358,29 +332,20 @@ window.barbutGame = (function () {
     private bool   showResult   = false;
     private string errorMsg     = "";
 
-    private int[]    playerDice = Array.Empty<int>();
-    private int[][] aiDice     = { Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>() };
-
-    private int    playerSum = 0;
-    private int[]  aiSums    = new int[3];
-    private double netGain    = 0;
-    private int    beatCount = 0;
-
-    private int barbutGameId = 0;
+    private int  barbutGameId = 0;
     private int? currentBetId = null;
 
     private List<int> history = new();
-    private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
     private DotNetObjectReference<Barbut>? dotnetRef;
 
+    // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += Refresh;
-        PickRandomAINames();
+        BB.PickRandomAINames();
 
         var game = GameRepo.GetByName("Craps");
-        if (game != null)
-            barbutGameId = game.Id;
+        if (game != null) barbutGameId = game.Id;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -392,13 +357,6 @@ window.barbutGame = (function () {
         }
     }
 
-    private void PickRandomAINames()
-    {
-        var rng     = new Random();
-        aiNames     = namePool.OrderBy(_ => rng.Next()).Take(3).ToArray();
-        aiAvatars   = avatarPool.OrderBy(_ => rng.Next()).Take(3).ToArray();
-    }
-
     private void Refresh() => InvokeAsync(StateHasChanged);
 
     public void Dispose()
@@ -407,15 +365,12 @@ window.barbutGame = (function () {
         dotnetRef?.Dispose();
     }
 
-    @* ── Logica noua la apasarea jetonului ── *@
+    // ── Betting ───────────────────────────────────────────────────────────
     private void HandleChipClick(int chipValue)
     {
         if (isRolling) return;
-
-        // Selectează vizual jetonul
         selectedChip = chipValue;
 
-        // Verifică dacă utilizatorul are suficienți bani pentru a adăuga valoarea jetonului
         if (Session.CurrentPlayer!.Balance < betAmount + chipValue)
         {
             errorMsg = "Balanță insuficientă!";
@@ -424,7 +379,7 @@ window.barbutGame = (function () {
 
         errorMsg   = "";
         showResult = false;
-        betAmount += chipValue; // Adaugă direct la bet
+        betAmount += chipValue;
     }
 
     private void ClearBet()
@@ -434,6 +389,7 @@ window.barbutGame = (function () {
         errorMsg   = "";
     }
 
+    // ── Roll ──────────────────────────────────────────────────────────────
     private async Task Roll()
     {
         if (isRolling || betAmount == 0) return;
@@ -443,120 +399,59 @@ window.barbutGame = (function () {
             return;
         }
 
-        var balAfterBet = Session.CurrentPlayer.Balance - betAmount;
+        // Delegate all dice/score/payout logic to the service
+        var setup = BB.PrepareRoll(betAmount, diceCount, Session.CurrentPlayer.Balance);
+
+        // Deduct bet and persist
         currentBetId = BetRepo.Create(new Bet
         {
-            PlayerId = Session.CurrentPlayer.Id,
-            GameId = barbutGameId,
+            PlayerId  = Session.CurrentPlayer.Id,
+            GameId    = barbutGameId,
             SessionId = null,
-            Amount = betAmount,
-            Status = "Pending"
+            Amount    = betAmount,
+            Status    = "Pending"
         });
-        Session.UpdateBalance(balAfterBet);
-        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, balAfterBet);
+        Session.UpdateBalance(setup.BalanceAfterBet);
+        PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, setup.BalanceAfterBet);
 
         errorMsg   = "";
         isRolling  = true;
         showResult = false;
-        netGain    = 0;
-        beatCount  = 0;
-
-        var rng    = new Random();
-        playerDice = Enumerable.Range(0, diceCount).Select(_ => rng.Next(1, 7)).ToArray();
-        for (int i = 0; i < 3; i++)
-            aiDice[i] = Enumerable.Range(0, diceCount).Select(_ => rng.Next(1, 7)).ToArray();
-
-        playerSum = playerDice.Sum();
-        for (int i = 0; i < 3; i++)
-            aiSums[i] = aiDice[i].Sum();
-
-        beatCount = aiSums.Count(s => playerSum > s);
-        double returns = beatCount switch
-        {
-            3 => betAmount * 3,
-            2 => betAmount * 2,
-            1 => betAmount,
-            _ => 0
-        };
-        netGain = returns - betAmount;
 
         StateHasChanged();
 
+        // Kick off JS animation — JS will call OnRollComplete when done
         await JS.InvokeVoidAsync("barbutGame.roll",
             diceCount,
-            playerDice,
-            new[] { aiDice[0], aiDice[1], aiDice[2] });
+            setup.PlayerDice,
+            new[] { setup.AIDice[0], setup.AIDice[1], setup.AIDice[2] });
     }
 
+    // ── JS callback ───────────────────────────────────────────────────────
     [JSInvokable]
     public async Task OnRollComplete()
     {
-        double returns = netGain + betAmount;
-        if (returns > 0)
+        var result = BB.ResolveRoll(betAmount, Session.CurrentPlayer!.Balance);
+
+        if (result.BalanceChanged)
         {
-            var newBal = Session.CurrentPlayer!.Balance + returns;
-            Session.UpdateBalance(newBal);
-            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBal);
+            Session.UpdateBalance(result.NewBalance);
+            PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, result.NewBalance);
         }
 
-        history.Add(beatCount);
+        history.Add(BB.BeatCount);
+
+        if (currentBetId.HasValue)
+        {
+            BetRepo.UpdateStatus(currentBetId.Value, result.BetStatus);
+            currentBetId = null;
+        }
 
         isRolling  = false;
         showResult = true;
-        if (currentBetId.HasValue)
-        {
-            string status = netGain > 0 ? "Won"
-                          : netGain == 0 ? "Push"
-                          : "Lost";
-
-            BetRepo.UpdateStatus(currentBetId.Value, status);
-            currentBetId = null;
-        }
         betAmount  = 0;
 
         await InvokeAsync(StateHasChanged);
-    }
-
-    private string GetPlayerCardClass()
-    {
-        if (beatCount == 3) return "card-winner";
-        if (beatCount == 0) return "card-loser";
-        return "card-neutral";
-    }
-
-    private string GetPlayerSumClass() =>
-        beatCount == 3 ? "sum-win" : beatCount == 0 ? "sum-lose" : "sum-push";
-
-    private string GetAICardClass(int idx)
-    {
-        if (playerSum < aiSums[idx]) return "card-winner";
-        if (playerSum > aiSums[idx]) return "card-loser";
-        return "card-neutral";
-    }
-
-    private string GetAISumClass(int idx) =>
-        playerSum < aiSums[idx] ? "sum-win" : playerSum > aiSums[idx] ? "sum-lose" : "sum-push";
-
-    private string GetAIVerdictClass(int idx) =>
-        playerSum < aiSums[idx] ? "verdict-win" : playerSum > aiSums[idx] ? "verdict-lose" : "verdict-push";
-
-    private string GetAIVerdictText(int idx) =>
-        playerSum < aiSums[idx] ? "ȘI-A BĂT JUCĂTORUL" :
-        playerSum > aiSums[idx] ? "BĂTUT DE JUCĂTOR" : "EGALITATE";
-
-    private string BuildDieDots(int value)
-    {
-        var dots = value switch
-        {
-            1 => new[] { "mc" },
-            2 => new[] { "tr", "bl" },
-            3 => new[] { "tr", "mc", "bl" },
-            4 => new[] { "tl", "tr", "bl", "br" },
-            5 => new[] { "tl", "tr", "mc", "bl", "br" },
-            6 => new[] { "tl", "tr", "ml", "mr", "bl", "br" },
-            _ => Array.Empty<string>()
-        };
-        return string.Concat(dots.Select(p => $"<span class='dot dot-{p}'></span>"));
     }
 }
 
