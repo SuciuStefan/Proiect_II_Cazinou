@@ -1,3 +1,4 @@
+using CasinoApp.BusinessLogic.Services;
 using CasinoApp.DataAccess.DB_operations;
 using CasinoApp.DataAccess.Entities;
 using CasinoApp.Web.Components.Pages;
@@ -5,162 +6,132 @@ using CasinoApp.Web.Components.Pages.Games;
 using Microsoft.JSInterop;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace CasinoApp.Tests;
 
-public class BarbutComponentTests
+public class BarbutServiceTests
 {
     [Fact]
-    public void HandleChipClick_InsufficientBalance_ShowsErrorMessageAndDoesNotUpdateBet()
+    public void PickRandomAINames_PopulatesNamesAndAvatars()
     {
-        using var database = new TemporaryDatabase();
-        var component = new Barbut();
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(new Player { Id = 1, Username = "Test", Balance = 10 });
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetField(component, "betAmount", 0);
-        ReflectionTestSupport.Invoke(component, "HandleChipClick", 25);
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        var betAmount = ReflectionTestSupport.GetField<int>(component, "betAmount");
-        Assert.Equal("Balanță insuficientă!", errorMsg);
-        Assert.Equal(0, betAmount);
+        var service = new BarbutService();
+
+        service.PickRandomAINames();
+
+        Assert.Equal(3, service.AINames.Length);
+        Assert.Equal(3, service.AIAvatars.Length);
+        Assert.All(service.AINames, name => Assert.False(string.IsNullOrWhiteSpace(name)));
+        Assert.All(service.AIAvatars, avatar => Assert.False(string.IsNullOrWhiteSpace(avatar)));
     }
+
     [Fact]
-    public void HandleChipClick_SufficientBalance_UpdatesBetAndClearsError()
+    public void PrepareRoll_CalculatesCorrectInitialState()
     {
-        using var database = new TemporaryDatabase();
-        var component = new Barbut();
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(new Player { Id = 1, Username = "Test", Balance = 100 });
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetField(component, "betAmount", 0);
-        ReflectionTestSupport.SetField(component, "errorMsg", "error");
-        ReflectionTestSupport.Invoke(component, "HandleChipClick", 25);
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        var betAmount = ReflectionTestSupport.GetField<int>(component, "betAmount");
-        Assert.Equal("", errorMsg);
-        Assert.Equal(25, betAmount);
+        var service = new BarbutService();
+        double initialBalance = 1000;
+        int betAmount = 50;
+        int diceCount = 2;
+
+        var setup = service.PrepareRoll(betAmount, diceCount, initialBalance);
+
+        Assert.Equal(950, setup.BalanceAfterBet);
+        Assert.Equal(2, setup.PlayerDice.Length);
+        Assert.Equal(3, setup.AIDice.Length);
+        Assert.Equal(3, setup.AISums.Length);
+
+        Assert.All(setup.PlayerDice, die => Assert.InRange(die, 1, 6));
     }
+
     [Fact]
-    public void ClearBet_ResetsBetAmountAndStatus()
+    public void ResolveRoll_UpdatesBalanceCorrectly_BasedOnNetGain()
     {
-        using var database = new TemporaryDatabase();
-        var component = new Barbut();
-        ReflectionTestSupport.SetField(component, "betAmount", 50);
-        ReflectionTestSupport.SetField(component, "showResult", true);
-        ReflectionTestSupport.SetField(component, "errorMsg", "error");
-        ReflectionTestSupport.Invoke(component, "ClearBet");
-        var betAmount = ReflectionTestSupport.GetField<int>(component, "betAmount");
-        var showResult = ReflectionTestSupport.GetField<bool>(component, "showResult");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        Assert.Equal(0, betAmount);
-        Assert.False(showResult);
-        Assert.Equal("", errorMsg);
+        var service = new BarbutService();
+        double balanceAfterBet = 950;
+        int betAmount = 50;
+
+        var setup = service.PrepareRoll(betAmount, 2, 1000);
+        var result = service.ResolveRoll(betAmount, balanceAfterBet);
+
+        double expectedReturns = setup.NetGain + betAmount;
+        bool expectedWin = expectedReturns > 0;
+        double expectedBalance = expectedWin ? balanceAfterBet + expectedReturns : balanceAfterBet;
+
+        Assert.Equal(expectedBalance, result.NewBalance);
+        Assert.Equal(setup.NetGain > 0 ? "Won" : setup.NetGain == 0 ? "Push" : "Lost", result.BetStatus);
     }
-    [Fact]
-    public void Roll_WithZeroBet_DoesNotStartRoll()
-    {
-        using var database = new TemporaryDatabase();
-        var component = new Barbut();
-        ReflectionTestSupport.SetField(component, "betAmount", 0);
-        ReflectionTestSupport.SetField(component, "isRolling", false);
-        ReflectionTestSupport.Invoke(component, "Roll");
-        var isRolling = ReflectionTestSupport.GetField<bool>(component, "isRolling");
-        Assert.False(isRolling);
-    }
-    [Fact]
-    public void Roll_InsufficientBalance_ShowsErrorMessage()
-    {
-        using var database = new TemporaryDatabase();
-        var component = new Barbut();
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(new Player { Id = 1, Username = "Test", Balance = 10 });
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetField(component, "betAmount", 50);
-        ReflectionTestSupport.Invoke(component, "Roll");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        var isRolling = ReflectionTestSupport.GetField<bool>(component, "isRolling");
-        Assert.Equal("Balanță insuficientă!", errorMsg);
-        Assert.False(isRolling);
-    }
+
     [Theory]
-    [InlineData(3, 100.0, 1100.0)]
-    [InlineData(2, 50.0, 1050.0)]
-    [InlineData(1, 0.0, 1000.0)]
-    [InlineData(0, -50.0, 950.0)]
-    public void OnRollComplete_UpdatesBalanceCorrectly_BasedOnBeatCount(int beatCount, double netGain, double expectedBalance)
+    [InlineData(3, "card-winner", "sum-win")]
+    [InlineData(0, "card-loser", "sum-lose")]
+    [InlineData(1, "card-neutral", "sum-push")]
+    public void UIHelpers_ReturnCorrectCSSClasses_ForPlayer(int forceBeatCount, string expectedCard, string expectedSum)
     {
-        using var database = new TemporaryDatabase();
-        var component = new Barbut();
-        var playerRepo = new PlayerRepository();
-        playerRepo.Create(new Player { Username = "TestUser", Email = "test@gmail.com", Password = "123", Balance = 950 });
-        var player = playerRepo.GetByUsername("TestUser");
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(player);
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetMember(component, "PlayerRepo", playerRepo);
-        ReflectionTestSupport.SetMember(component, "BetRepo", new BetRepository());
-        ReflectionTestSupport.SetField(component, "betAmount", 50);
-        ReflectionTestSupport.SetField(component, "netGain", netGain);
-        ReflectionTestSupport.SetField(component, "beatCount", beatCount);
-        ReflectionTestSupport.SetField(component, "currentBetId", null);
-        ReflectionTestSupport.Invoke(component, "OnRollComplete");
-        var finalBalance = sessionService.CurrentPlayer.Balance;
-        Assert.Equal(expectedBalance, finalBalance);
+        var service = new BarbutService();
+
+        typeof(BarbutService).GetProperty("BeatCount")?.SetValue(service, forceBeatCount);
+
+        var cardClass = service.GetPlayerCardClass();
+        var sumClass = service.GetPlayerSumClass();
+
+        Assert.Equal(expectedCard, cardClass);
+        Assert.Equal(expectedSum, sumClass);
     }
 }
 
-public class BlackjackComponentTests
+public class BlackjackServiceTests
 {
     [Fact]
-    public void AddChip_InsufficientBalance_ShowsErrorMessageAndDoesNotUpdateBet()
+    public void PlaceChip_InsufficientBalance_SetsErrorAndDoesNotUpdateBet()
     {
-        using var database = new TemporaryDatabase();
-        var component = new Blackjack();
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(new Player { Id = 1, Username = "Test", Balance = 10 });
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetField(component, "currentBet", 0m);
-        ReflectionTestSupport.Invoke(component, "AddChip", 25);
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        var currentBet = ReflectionTestSupport.GetField<decimal>(component, "currentBet");
+        var service = new BlackjackService();
+
+        service.PlaceChip(25, 10, out string? errorMsg);
+
         Assert.Equal("Balanta insuficienta!", errorMsg);
-        Assert.Equal(0m, currentBet);
+        Assert.Equal(0m, service.CurrentBet);
     }
+
     [Fact]
-    public void AddChip_SufficientBalance_UpdatesBetAndClearsError()
+    public void PlaceChip_SufficientBalance_UpdatesBetAndClearsError()
     {
-        using var database = new TemporaryDatabase();
-        var component = new Blackjack();
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(new Player { Id = 1, Username = "Test", Balance = 100 });
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetField(component, "currentBet", 0m);
-        ReflectionTestSupport.SetField(component, "errorMsg", "existing error");
-        ReflectionTestSupport.SetField(component, "isResetting", false);
-        ReflectionTestSupport.Invoke(component, "AddChip", 25);
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        var currentBet = ReflectionTestSupport.GetField<decimal>(component, "currentBet");
-        Assert.Equal("", errorMsg);
-        Assert.Equal(25m, currentBet);
+        var service = new BlackjackService();
+
+        service.PlaceChip(25, 100, out string? errorMsg);
+
+        Assert.Null(errorMsg);
+        Assert.Equal(25m, service.CurrentBet);
     }
+
     [Fact]
-    public void ClearBet_ResetsBetAmountAndError()
+    public void ClearBet_ResetsBetAmount()
     {
-        using var database = new TemporaryDatabase();
-        var component = new Blackjack();
-        ReflectionTestSupport.SetField(component, "currentBet", 50m);
-        ReflectionTestSupport.SetField(component, "errorMsg", "some error");
-        ReflectionTestSupport.SetField(component, "isResetting", false);
-        ReflectionTestSupport.Invoke(component, "ClearBet");
-        var currentBet = ReflectionTestSupport.GetField<decimal>(component, "currentBet");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        Assert.Equal(0m, currentBet);
-        Assert.Equal("", errorMsg);
+        var service = new BlackjackService();
+        service.PlaceChip(50, 100, out _);
+
+        service.ClearBet();
+
+        Assert.Equal(0m, service.CurrentBet);
     }
+
+    [Fact]
+    public void Rebet_SufficientBalance_UpdatesBetToLastBet()
+    {
+        var service = new BlackjackService();
+
+        typeof(BlackjackService)
+            .GetField("_lastBet", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?.SetValue(service, 25m);
+
+        service.Rebet(100);
+
+        Assert.Equal(25m, service.CurrentBet);
+    }
+
     [Theory]
     [InlineData(22, 10, false, false, 10.0, 100.0, 0.0, "BUST — AI PIERDUT", -10.0, 100.0)]
     [InlineData(20, 21, false, true, 10.0, 100.0, 0.0, "DEALER BLACKJACK", -10.0, 100.0)]
@@ -175,166 +146,177 @@ public class BlackjackComponentTests
       double bet, double balance, double insuranceBet,
       string expectedMsg, double expectedWin, double expectedNewBalance)
     {
-        var method = typeof(Blackjack).GetMethod("ComputeHandResult", BindingFlags.NonPublic | BindingFlags.Static);
+        var method = typeof(BlackjackService).GetMethod("ComputeHandResult", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
+
         decimal mBet = (decimal)bet;
         decimal mBalance = (decimal)balance;
         decimal mInsuranceBet = (decimal)insuranceBet;
+
         var result = method.Invoke(null, new object[] { pv, dv, playerBJ, dealerBJ, mBet, mBalance, mInsuranceBet });
         var (msg, win, newBalance) = ((string, decimal, decimal))result!;
+
         Assert.Equal(expectedMsg, msg);
         Assert.Equal((decimal)expectedWin, win);
         Assert.Equal((decimal)expectedNewBalance, newBalance);
     }
+
+    [Fact]
+    public void GetHandValue_CalculatesAcesProperly()
+    {
+        var service = new BlackjackService();
+
+        var hand1 = new List<Card> { new Card("A", "♠", 1), new Card("K", "♥", 10) };
+        Assert.Equal(21, service.GetHandValue(hand1));
+
+        var hand2 = new List<Card> { new Card("A", "♠", 1), new Card("A", "♥", 1), new Card("K", "♦", 10) };
+        Assert.Equal(12, service.GetHandValue(hand2));
+    }
 }
 
-public class FlipACoinComponentTests
+public class FlipACoinServiceTests
 {
     [Fact]
-    public void PickChoice_ValidChoice_UpdatesPlayerChoiceAndClearsError()
+    public void AddChip_InsufficientBalance_SetsErrorAndDoesNotUpdateBet()
     {
-        using var database = new TemporaryDatabase();
-        var component = new FlipACoin();
-        ReflectionTestSupport.SetField(component, "isResetting", false);
-        ReflectionTestSupport.SetField(component, "errorMsg", "existing error");
-        ReflectionTestSupport.Invoke(component, "PickChoice", "heads");
-        var choice = ReflectionTestSupport.GetField<string>(component, "playerChoice");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        Assert.Equal("heads", choice);
-        Assert.Equal("", errorMsg);
-    }
-    [Fact]
-    public void AddChip_InsufficientBalance_ShowsErrorMessage()
-    {
-        using var database = new TemporaryDatabase();
-        var component = new FlipACoin();
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(new Player { Id = 1, Username = "Test", Balance = 10 });
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetField(component, "currentBet", 0m);
-        ReflectionTestSupport.SetField(component, "isStreak", false);
-        ReflectionTestSupport.SetField(component, "isResetting", false);
-        ReflectionTestSupport.Invoke(component, "AddChip", 25);
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        var currentBet = ReflectionTestSupport.GetField<decimal>(component, "currentBet");
+        var service = new FlipACoinService();
+
+        service.AddChip(25, 10, out string? errorMsg);
+
         Assert.Equal("Balanta insuficienta!", errorMsg);
-        Assert.Equal(0m, currentBet);
+        Assert.Equal(0m, service.CurrentBet);
     }
+
     [Fact]
-    public void AddChip_DuringStreak_ShowsStreakErrorMessage()
+    public void AddChip_DuringStreak_SetsStreakErrorMsg()
     {
-        using var database = new TemporaryDatabase();
-        var component = new FlipACoin();
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(new Player { Id = 1, Username = "Test", Balance = 1000 });
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetField(component, "currentBet", 50m);
-        ReflectionTestSupport.SetField(component, "isStreak", true);
-        ReflectionTestSupport.SetField(component, "isResetting", false);
-        ReflectionTestSupport.Invoke(component, "AddChip", 10);
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        var currentBet = ReflectionTestSupport.GetField<decimal>(component, "currentBet");
+        var service = new FlipACoinService();
+
+        typeof(FlipACoinService).GetProperty("IsStreak")?.SetValue(service, true);
+        typeof(FlipACoinService).GetProperty("CurrentBet")?.SetValue(service, 50m);
+
+        service.AddChip(10, 1000, out string? errorMsg);
+
         Assert.Equal("Ești pe dublaj! Dă FLIP sau apasă pe încasare.", errorMsg);
-        Assert.Equal(50m, currentBet);
+        Assert.Equal(50m, service.CurrentBet);
     }
+
     [Fact]
-    public void ClearBet_NormalState_ResetsBetAmount()
+    public void ClearBet_ResetsBetAmountAndStreak()
     {
-        using var database = new TemporaryDatabase();
-        var component = new FlipACoin();
-        ReflectionTestSupport.SetField(component, "currentBet", 50m);
-        ReflectionTestSupport.SetField(component, "isStreak", false);
-        ReflectionTestSupport.SetField(component, "isResetting", false);
-        ReflectionTestSupport.Invoke(component, "ClearBet");
-        var currentBet = ReflectionTestSupport.GetField<decimal>(component, "currentBet");
-        Assert.Equal(0m, currentBet);
+        var service = new FlipACoinService();
+        typeof(FlipACoinService).GetProperty("CurrentBet")?.SetValue(service, 50m);
+        typeof(FlipACoinService).GetProperty("IsStreak")?.SetValue(service, true);
+
+        service.ClearBet();
+
+        Assert.Equal(0m, service.CurrentBet);
+        Assert.False(service.IsStreak);
     }
+
     [Fact]
-    public void ClearBet_DuringStreak_CashesOutAndUpdatesBalance()
+    public void CollectStreak_AddsBetToBalanceAndClearsBet()
     {
-        using var database = new TemporaryDatabase();
-        var component = new FlipACoin();
-        var playerRepo = new PlayerRepository();
-        playerRepo.Create(new Player { Username = "TestUser", Email = "test@gmail.com", Password = "123", Balance = 100.0 });
-        var player = playerRepo.GetByUsername("TestUser");
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(player);
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetMember(component, "PlayerRepo", playerRepo);
-        ReflectionTestSupport.SetMember(component, "BetRepo", new BetRepository());
-        ReflectionTestSupport.SetField(component, "currentBet", 150m);
-        ReflectionTestSupport.SetField(component, "isStreak", true);
-        ReflectionTestSupport.SetField(component, "isResetting", false);
-        ReflectionTestSupport.SetField(component, "currentBetId", null);
-        ReflectionTestSupport.Invoke(component, "ClearBet");
-        var finalBalance = sessionService.CurrentPlayer.Balance;
-        var currentBet = ReflectionTestSupport.GetField<decimal>(component, "currentBet");
-        var isStreak = ReflectionTestSupport.GetField<bool>(component, "isStreak");
-        Assert.Equal(250.0, finalBalance);
-        Assert.Equal(0m, currentBet);
-        Assert.False(isStreak);
+        var service = new FlipACoinService();
+        typeof(FlipACoinService).GetProperty("CurrentBet")?.SetValue(service, 150m);
+        typeof(FlipACoinService).GetProperty("IsStreak")?.SetValue(service, true);
+
+        var result = service.CollectStreak(100.0);
+
+        Assert.Equal(250.0, result.NewBalance);
+        Assert.Equal(0m, service.CurrentBet);
+        Assert.False(service.IsStreak);
+        Assert.Equal("Won", result.BetStatus);
     }
+
     [Fact]
     public void Rebet_SufficientBalance_UpdatesBetToLastBet()
     {
-        using var database = new TemporaryDatabase();
-        var component = new FlipACoin();
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(new Player { Id = 1, Username = "Test", Balance = 100 });
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetField(component, "lastBet", 25m);
-        ReflectionTestSupport.SetField(component, "currentBet", 0m);
-        ReflectionTestSupport.SetField(component, "isResetting", false);
-        ReflectionTestSupport.SetField(component, "isStreak", false);
-        ReflectionTestSupport.Invoke(component, "Rebet");
-        var currentBet = ReflectionTestSupport.GetField<decimal>(component, "currentBet");
-        Assert.Equal(25m, currentBet);
+        var service = new FlipACoinService();
+        typeof(FlipACoinService).GetProperty("LastBet")?.SetValue(service, 25m);
+
+        service.Rebet(100.0, out string? error);
+
+        Assert.Null(error);
+        Assert.Equal(25m, service.CurrentBet);
     }
+
     [Theory]
-    [InlineData(0, "heads", false, false)]
-    [InlineData(10, "", false, false)]
-    [InlineData(10, "heads", false, true)]
-    [InlineData(50, "tails", true, true)]
-    public void CanFlip_EvaluatesConditionsProperly(
-      double betAmount, string choice, bool streak, bool expectedResult)
+    [InlineData(0, false, 100.0, false)]
+    [InlineData(10, false, 5.0, false)]
+    [InlineData(10, false, 10.0, true)]
+    [InlineData(50, true, 0.0, true)]
+    public void CanFlip_EvaluatesConditionsProperly(double betAmount, bool isStreak, double balance, bool expectedResult)
     {
-        using var database = new TemporaryDatabase();
-        var component = new FlipACoin();
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(new Player { Id = 1, Username = "Test", Balance = 100 });
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetField(component, "currentBet", (decimal)betAmount);
-        ReflectionTestSupport.SetField(component, "playerChoice", choice);
-        ReflectionTestSupport.SetField(component, "isStreak", streak);
-        ReflectionTestSupport.SetField(component, "isResetting", false);
-        var method = component.GetType().GetMethod("CanFlip", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var canFlip = (bool)method!.Invoke(component, null)!;
+        var service = new FlipACoinService();
+        typeof(FlipACoinService).GetProperty("CurrentBet")?.SetValue(service, (decimal)betAmount);
+        typeof(FlipACoinService).GetProperty("IsStreak")?.SetValue(service, isStreak);
+
+        bool canFlip = service.CanFlip(balance);
+
         Assert.Equal(expectedResult, canFlip);
+    }
+
+    [Fact]
+    public void Flip_WhenPlayerWins_DoublesPotAndContinuesStreak()
+    {
+        var service = new FlipACoinService();
+        FlipResult result;
+
+        do
+        {
+            typeof(FlipACoinService).GetProperty("CurrentBet")?.SetValue(service, 50m);
+            result = service.Flip(1000.0, "heads");
+        } while (!result.Won);
+
+        Assert.Equal(100m, result.NewCurrentBet);
+        Assert.True(result.IsStreak);
+        Assert.False(result.LimitReached);
+        Assert.Equal("Pending", result.BetStatus);
+    }
+
+    [Fact]
+    public void Flip_WhenPlayerLoses_ZerosPotAndEndsStreak()
+    {
+        var service = new FlipACoinService();
+        FlipResult result;
+
+        do
+        {
+            typeof(FlipACoinService).GetProperty("CurrentBet")?.SetValue(service, 50m);
+            result = service.Flip(1000.0, "heads");
+        } while (result.Won);
+
+        Assert.Equal(0m, result.NewCurrentBet);
+        Assert.False(result.IsStreak);
+        Assert.Equal("Lost", result.BetStatus);
+        Assert.Equal(-50m, result.ResultWin);
+    }
+
+    [Fact]
+    public void Flip_WhenWinHitsLimit_AutoCollectsAndEndsStreak()
+    {
+        var service = new FlipACoinService();
+        FlipResult result;
+
+        do
+        {
+            typeof(FlipACoinService).GetProperty("CurrentBet")?.SetValue(service, 6000m);
+            result = service.Flip(1000.0, "heads");
+        } while (!result.Won);
+
+        Assert.True(result.LimitReached);
+        Assert.True(result.ShouldCreditWin);
+        Assert.Equal(12000.0, result.CreditAmount);
+        Assert.Equal("Won", result.BetStatus);
+
+        Assert.Equal(0m, service.CurrentBet);
+        Assert.False(service.IsStreak);
     }
 }
 
-public class MinesComponentTests
+public class MinesServiceTests
 {
-    private (Mines component, CasinoApp.Web.Services.SessionService session) SetupComponent(double initialBalance)
-    {
-        var component = new Mines();
-        var playerRepo = new PlayerRepository();
-        playerRepo.Create(new Player { Username = "TestUser", Email = "test@gmail.com", Password = "123", Balance = initialBalance });
-        var player = playerRepo.GetByUsername("TestUser");
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(player!);
-        var gameRepo = new GameRepository();
-        var game = gameRepo.GetByName("Mines");
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetMember(component, "PlayerRepo", playerRepo);
-        ReflectionTestSupport.SetMember(component, "BetRepo", new BetRepository());
-        ReflectionTestSupport.SetMember(component, "GameRepo", gameRepo);
-        if (game != null)
-        {
-            ReflectionTestSupport.SetField(component, "minesGameId", game.Id);
-        }
-        return (component, sessionService);
-    }
     [Theory]
     [InlineData(25, 10, 10)]
     [InlineData(25, 30, 23)]
@@ -342,147 +324,193 @@ public class MinesComponentTests
     [InlineData(49, 50, 47)]
     public void SetGridSize_CapsMineCountToMaxMines(int requestedGridSize, int requestedMines, int expectedMines)
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100);
-        ReflectionTestSupport.SetField(component, "mineCount", requestedMines);
-        ReflectionTestSupport.Invoke(component, "SetGridSize", requestedGridSize);
-        Assert.Equal(requestedGridSize, ReflectionTestSupport.GetField<int>(component, "gridSize"));
-        Assert.Equal(expectedMines, ReflectionTestSupport.GetField<int>(component, "mineCount"));
+        var service = new MinesService();
+
+        service.SetGridSize(64);
+        service.SetMineCount(requestedMines);
+        service.SetGridSize(requestedGridSize);
+
+        Assert.Equal(requestedGridSize, service.GridSize);
+        Assert.Equal(expectedMines, service.MineCount);
     }
+
     [Fact]
     public void BettingModifiers_DoubleAndHalf_CalculateCorrectly()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(1000);
-        ReflectionTestSupport.SetField(component, "currentBet", 50m);
-        ReflectionTestSupport.Invoke(component, "DoubleBet");
-        Assert.Equal(100m, ReflectionTestSupport.GetField<decimal>(component, "currentBet"));
-        ReflectionTestSupport.Invoke(component, "HalfBet");
-        Assert.Equal(50m, ReflectionTestSupport.GetField<decimal>(component, "currentBet"));
+        var service = new MinesService();
+        service.AddChip(50, 1000, out _);
+
+        service.DoubleBet(1000, out string? errorMsgDouble);
+        Assert.Null(errorMsgDouble);
+        Assert.Equal(100m, service.CurrentBet);
+
+        service.HalfBet();
+        Assert.Equal(50m, service.CurrentBet);
     }
+
     [Fact]
-    public void StartGame_ValidBet_DeductsBalanceAndPlacesMines()
+    public void StartGame_ValidBet_DeductsBalanceAndInitializesGrid()
     {
-        using var database = new TemporaryDatabase();
-        var (component, session) = SetupComponent(200);
-        ReflectionTestSupport.SetField(component, "currentBet", 50m);
-        ReflectionTestSupport.SetField(component, "gridSize", 25);
-        ReflectionTestSupport.Invoke(component, "StartGame");
-        Assert.Equal("Playing", ReflectionTestSupport.GetField<object>(component, "gameState").ToString());
-        Assert.Equal(150.0, session.CurrentPlayer!.Balance);
+        var service = new MinesService();
+        service.AddChip(50, 200, out _);
+
+        var result = service.StartGame(200);
+
+        Assert.Equal(MinesGameState.Playing, service.GameState);
+        Assert.Equal(150.0, result.BalanceAfterBet);
+        Assert.Equal(50m, result.BetAmount);
+        Assert.Equal(service.GridSize, service.Cells.Length);
+        Assert.All(service.Cells, cell => Assert.Equal(MinesCellState.Hidden, cell));
     }
+
     [Fact]
-    public void RevealCell_Mine_TriggersGameOver()
+    public void RevealCell_Mine_TriggersGameOverAndLoss()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(200);
-        ReflectionTestSupport.SetField(component, "currentBet", 50m);
-        ReflectionTestSupport.SetField(component, "gridSize", 25);
-        ReflectionTestSupport.Invoke(component, "StartGame");
-        var stateAfterStart = ReflectionTestSupport.GetField<object>(component, "gameState").ToString();
-        Assert.Equal("Playing", stateAfterStart);
-        var fixedMines = new HashSet<int> { 10 };
-        ReflectionTestSupport.SetField(component, "mineSet", fixedMines);
-        ReflectionTestSupport.Invoke(component, "RevealCell", 10);
-        var finalState = ReflectionTestSupport.GetField<object>(component, "gameState").ToString();
-        Assert.Equal("GameOver", finalState);
+        var service = new MinesService();
+        service.AddChip(50, 200, out _);
+        service.StartGame(200);
+
+        var mineSet = (HashSet<int>)typeof(MinesService)
+            .GetField("_mineSet", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(service)!;
+
+        int mineIndex = mineSet.First();
+
+        var result = service.RevealCell(mineIndex, 150.0);
+
+        Assert.True(result.HitMine);
+        Assert.Equal(MinesGameState.GameOver, service.GameState);
+        Assert.Equal("Lost", result.BetStatus);
+        Assert.Equal(150.0, result.NewBalance);
+        Assert.Equal(MinesCellState.MineBoom, service.Cells[mineIndex]);
+    }
+
+    [Fact]
+    public void RevealCell_SafeCell_IncreasesMultiplier_ThenCashOut()
+    {
+        var service = new MinesService();
+        service.AddChip(10, 100, out _);
+        service.StartGame(100);
+
+        var mineSet = (HashSet<int>)typeof(MinesService)
+            .GetField("_mineSet", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(service)!;
+
+        int safeIndex = Enumerable.Range(0, service.GridSize).First(i => !mineSet.Contains(i));
+
+        var revealResult = service.RevealCell(safeIndex, 90.0);
+
+        Assert.False(revealResult.HitMine);
+        Assert.Equal(1, service.SafeRevealed);
+        Assert.Equal(MinesCellState.Safe, service.Cells[safeIndex]);
+        Assert.True(service.CurrentMultiplier > 1.0);
+
+        var cashOutResult = service.CashOut(90.0);
+
+        Assert.Equal(MinesGameState.CashedOut, service.GameState);
+        Assert.True(cashOutResult.CashOutWin > 10m);
+        Assert.True(cashOutResult.NewBalance > 100.0);
     }
 }
 
-public class RouletteComponentTests
+public class RouletteServiceTests
 {
-    private (Roulette component, CasinoApp.Web.Services.SessionService session) SetupComponent(double initialBalance)
-    {
-        var component = new Roulette();
-        var playerRepo = new PlayerRepository();
-        playerRepo.Create(new Player { Username = "TestUser", Email = "test@gmail.com", Password = "123", Balance = initialBalance });
-        var player = playerRepo.GetByUsername("TestUser");
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(player!);
-        var gameRepo = new GameRepository();
-        var game = gameRepo.GetByName("Roulette");
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetMember(component, "PlayerRepo", playerRepo);
-        ReflectionTestSupport.SetMember(component, "BetRepo", new BetRepository());
-        ReflectionTestSupport.SetMember(component, "GameRepo", gameRepo);
-        if (game != null)
-        {
-            ReflectionTestSupport.SetField(component, "rouletteGameId", game.Id);
-        }
-        return (component, sessionService);
-    }
-    #region 1. Betting Mechanics Tests
-    [Fact]
+    [Fact]
     public void PlaceBet_SufficientBalance_AddsToBetsDictionary()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100);
-        ReflectionTestSupport.SetField(component, "selectedChip", 10);
-        ReflectionTestSupport.SetField(component, "bets", new Dictionary<string, int>());
-        ReflectionTestSupport.SetField(component, "isSpinning", false);
-        ReflectionTestSupport.Invoke(component, "PlaceBet", "num-15");
-        ReflectionTestSupport.Invoke(component, "PlaceBet", "red");
-        var bets = ReflectionTestSupport.GetField<Dictionary<string, int>>(component, "bets");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        Assert.Equal("", errorMsg);
-        Assert.True(bets.ContainsKey("num-15"));
-        Assert.True(bets.ContainsKey("red"));
-        Assert.Equal(10, bets["num-15"]);
-        Assert.Equal(10, bets["red"]);
+        var service = new RouletteService();
+
+        service.PlaceBet("num-15", 10, 100, out string? errorMsg1);
+        service.PlaceBet("red", 10, 100, out string? errorMsg2);
+
+        Assert.Null(errorMsg1);
+        Assert.Null(errorMsg2);
+        Assert.True(service.Bets.ContainsKey("num-15"));
+        Assert.True(service.Bets.ContainsKey("red"));
+        Assert.Equal(10, service.Bets["num-15"]);
+        Assert.Equal(10, service.Bets["red"]);
+        Assert.Equal(20, service.TotalBet);
     }
+
     [Fact]
     public void PlaceBet_SameCellTwice_AccumulatesChipValue()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100);
-        ReflectionTestSupport.SetField(component, "selectedChip", 25);
-        ReflectionTestSupport.SetField(component, "bets", new Dictionary<string, int>());
-        ReflectionTestSupport.Invoke(component, "PlaceBet", "black");
-        ReflectionTestSupport.Invoke(component, "PlaceBet", "black");
-        var bets = ReflectionTestSupport.GetField<Dictionary<string, int>>(component, "bets");
-        Assert.Equal(50, bets["black"]);
+        var service = new RouletteService();
+
+        service.PlaceBet("black", 25, 100, out _);
+        service.PlaceBet("black", 25, 100, out _);
+
+        Assert.Equal(50, service.Bets["black"]);
+        Assert.Equal(50, service.TotalBet);
     }
+
     [Fact]
     public void PlaceBet_InsufficientBalance_ShowsErrorAndRejectsBet()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(10);
-        ReflectionTestSupport.SetField(component, "selectedChip", 25);
-        ReflectionTestSupport.SetField(component, "bets", new Dictionary<string, int>());
-        ReflectionTestSupport.Invoke(component, "PlaceBet", "even");
-        var bets = ReflectionTestSupport.GetField<Dictionary<string, int>>(component, "bets");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
+        var service = new RouletteService();
+
+        service.PlaceBet("even", 25, 10, out string? errorMsg);
+
         Assert.Equal("Balanță insuficientă!", errorMsg);
-        Assert.Empty(bets);
+        Assert.Empty(service.Bets);
     }
+
     [Fact]
     public void ClearBets_EmptiesDictionary()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100);
-        var existingBets = new Dictionary<string, int> { { "num-0", 5 }, { "red", 10 } };
-        ReflectionTestSupport.SetField(component, "bets", existingBets);
-        ReflectionTestSupport.Invoke(component, "ClearBets");
-        var bets = ReflectionTestSupport.GetField<Dictionary<string, int>>(component, "bets");
-        Assert.Empty(bets);
+        var service = new RouletteService();
+        service.PlaceBet("num-0", 5, 100, out _);
+        service.PlaceBet("red", 10, 100, out _);
+
+        service.ClearBets();
+
+        Assert.Empty(service.Bets);
+        Assert.Equal(0, service.TotalBet);
     }
-    #endregion
-    #region 2. Payout Engine Tests (CalculateWins)
-    [Theory]
+
+    [Fact]
+    public void PrepareSpin_WithoutBets_ReturnsError()
+    {
+        var service = new RouletteService();
+
+        var setup = service.PrepareSpin(100.0, out string? error);
+
+        Assert.Null(setup);
+        Assert.Equal("Plasează un pariu mai întâi!", error);
+    }
+
+    [Fact]
+    public void PrepareSpin_WithBets_GeneratesValidSpinSetup()
+    {
+        var service = new RouletteService();
+        service.PlaceBet("red", 20, 100, out _);
+
+        var setup = service.PrepareSpin(100.0, out string? error);
+
+        Assert.Null(error);
+        Assert.NotNull(setup);
+        Assert.Equal(80.0, setup.BalanceAfterBet);
+        Assert.Equal(20, setup.TotalBet);
+        Assert.True(service.WheelOrder.Contains(setup.WinningNumber));
+        Assert.NotEqual(0, setup.NewWheelDeg);
+        Assert.NotEqual(0, setup.NewBallDeg);
+    }
+
+    [Theory]
     [InlineData("num-17", 17, 10, 360)]
     [InlineData("num-17", 18, 10, 0)]
     [InlineData("num-0", 0, 10, 140)]
-    public void CalculateWins_StraightUpBets_CalculatesCorrectly(string betKey, int resultNumber, int betAmount, double expectedWin)
+    public void ResolveSpin_StraightUpBets_CalculatesCorrectly(string betKey, int resultNumber, int betAmount, double expectedWin)
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100);
-        var bets = new Dictionary<string, int> { { betKey, betAmount } };
-        ReflectionTestSupport.SetField(component, "bets", bets);
-        ReflectionTestSupport.SetField(component, "lastResult", resultNumber);
-        ReflectionTestSupport.Invoke(component, "CalculateWins");
-        var totalWin = ReflectionTestSupport.GetField<double>(component, "totalWin");
-        Assert.Equal(expectedWin, totalWin);
+        var service = new RouletteService();
+        service.PlaceBet(betKey, betAmount, 1000, out _);
+
+        var result = service.ResolveSpin(resultNumber, 1000 - betAmount);
+
+        Assert.Equal(expectedWin, result.TotalWin);
+        Assert.Empty(service.Bets);
     }
+
     [Theory]
     [InlineData("red", 1, 10, 20)]
     [InlineData("black", 2, 10, 20)]
@@ -496,292 +524,247 @@ public class RouletteComponentTests
     [InlineData("col1", 4, 10, 30)]
     [InlineData("col2", 5, 10, 30)]
     [InlineData("col3", 6, 10, 30)]
-    public void CalculateWins_OutsideBets_CalculatesCorrectPayouts(string betKey, int resultNumber, int betAmount, double expectedWin)
+    public void ResolveSpin_OutsideBets_CalculatesCorrectPayouts(string betKey, int resultNumber, int betAmount, double expectedWin)
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100);
-        var bets = new Dictionary<string, int> { { betKey, betAmount } };
-        ReflectionTestSupport.SetField(component, "bets", bets);
-        ReflectionTestSupport.SetField(component, "lastResult", resultNumber);
-        ReflectionTestSupport.Invoke(component, "CalculateWins");
-        var totalWin = ReflectionTestSupport.GetField<double>(component, "totalWin");
-        Assert.Equal(expectedWin, totalWin);
+        var service = new RouletteService();
+        service.PlaceBet(betKey, betAmount, 1000, out _);
+
+        var result = service.ResolveSpin(resultNumber, 1000 - betAmount);
+
+        Assert.Equal(expectedWin, result.TotalWin);
     }
+
     [Fact]
-    public void CalculateWins_ResultIsZero_LosesAllOutsideBets()
+    public void ResolveSpin_ResultIsZero_LosesAllOutsideBets()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100);
-        var bets = new Dictionary<string, int>
-    {
-      { "red", 10 },
-      { "even", 10 },
-      { "low", 10 },
-      { "doz1", 10 },
-      { "col1", 10 }
-    };
-        ReflectionTestSupport.SetField(component, "bets", bets);
-        ReflectionTestSupport.SetField(component, "lastResult", 0);
-        ReflectionTestSupport.Invoke(component, "CalculateWins");
-        var totalWin = ReflectionTestSupport.GetField<double>(component, "totalWin");
-        Assert.Equal(0, totalWin);
+        var service = new RouletteService();
+        service.PlaceBet("red", 10, 100, out _);
+        service.PlaceBet("even", 10, 100, out _);
+        service.PlaceBet("low", 10, 100, out _);
+        service.PlaceBet("doz1", 10, 100, out _);
+        service.PlaceBet("col1", 10, 100, out _);
+
+        var result = service.ResolveSpin(0, 50);
+
+        Assert.Equal(0, result.TotalWin);
+        Assert.Equal("Lost", result.BetStatus);
     }
-    [Fact]
-    public void CalculateWins_WinningCombination_UpdatesPlayerBalance()
-    {
-        using var database = new TemporaryDatabase();
-        var (component, session) = SetupComponent(100.0);
-        var bets = new Dictionary<string, int> { { "red", 50 } };
-        ReflectionTestSupport.SetField(component, "bets", bets);
-        ReflectionTestSupport.SetField(component, "lastResult", 9);
-        ReflectionTestSupport.Invoke(component, "CalculateWins");
-        var totalWin = ReflectionTestSupport.GetField<double>(component, "totalWin");
-        Assert.Equal(100, totalWin);
-        Assert.Equal(200.0, session.CurrentPlayer!.Balance);
-    }
-    #endregion
 }
 
-public class ScratchCardComponentTests
+public class ScratchCardServiceTests
 {
-    private (ScratchCard component, CasinoApp.Web.Services.SessionService session) SetupComponent(double initialBalance)
-    {
-        var component = new ScratchCard();
-        var playerRepo = new PlayerRepository();
-        playerRepo.Create(new Player { Username = "TestUser", Email = "test@gmail.com", Password = "123", Balance = initialBalance });
-        var player = playerRepo.GetByUsername("TestUser");
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(player!);
-        var gameRepo = new GameRepository();
-        var game = gameRepo.GetByName("Scratch Cards");
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetMember(component, "PlayerRepo", playerRepo);
-        ReflectionTestSupport.SetMember(component, "BetRepo", new BetRepository());
-        ReflectionTestSupport.SetMember(component, "GameRepo", gameRepo);
-        ReflectionTestSupport.SetMember(component, "JS", new DummyJSRuntime());
-        if (game != null)
-        {
-            ReflectionTestSupport.SetField(component, "scratchGameId", game.Id);
-        }
-        return (component, sessionService);
-    }
     [Fact]
     public void SelectCard_SufficientBalance_UpdatesSelectedCost()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100.0);
-        ReflectionTestSupport.Invoke(component, "SelectCard", 50);
-        var selectedCost = ReflectionTestSupport.GetField<int>(component, "selectedCost");
-        Assert.Equal(50, selectedCost);
+        var service = new ScratchCardService();
+
+        service.SelectCard(50, 100.0);
+
+        Assert.Equal(50, service.SelectedCost);
     }
+
     [Fact]
-    public void BuyCard_NoCardSelected_ShowsErrorMessage()
+    public void SelectCard_InsufficientBalance_DoesNotUpdateCost()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "selectedCost", 0);
-        ReflectionTestSupport.Invoke(component, "BuyCard");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
+        var service = new ScratchCardService();
+
+        service.SelectCard(50, 10.0);
+
+        Assert.Equal(0, service.SelectedCost);
+    }
+
+    [Fact]
+    public void BuyCard_NoCardSelected_ReturnsNullAndShowsError()
+    {
+        var service = new ScratchCardService();
+
+        var result = service.BuyCard(100.0, out string? errorMsg);
+
+        Assert.Null(result);
         Assert.Equal("Alege un bilet mai întâi!", errorMsg);
     }
+
     [Fact]
-    public void BuyCard_InsufficientBalance_ShowsErrorMessage()
+    public void BuyCard_InsufficientBalance_ReturnsNullAndShowsError()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(10.0);
-        ReflectionTestSupport.SetField(component, "selectedCost", 50);
-        ReflectionTestSupport.Invoke(component, "BuyCard");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
+        var service = new ScratchCardService();
+        service.SelectCard(50, 50.0);
+
+        var result = service.BuyCard(10.0, out string? errorMsg);
+
+        Assert.Null(result);
         Assert.Equal("Balanță insuficientă!", errorMsg);
     }
+
     [Fact]
     public void BuyCard_ValidTransaction_DeductsBalanceAndGeneratesGrid()
     {
-        using var database = new TemporaryDatabase();
-        var (component, session) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "selectedCost", 10);
-        ReflectionTestSupport.Invoke(component, "BuyCard");
-        var gameState = ReflectionTestSupport.GetField<object>(component, "gameState").ToString();
-        var grid = ReflectionTestSupport.GetField<string[]>(component, "grid");
-        Assert.Equal("Scratching", gameState);
-        Assert.Equal(90.0, session.CurrentPlayer!.Balance);
-        Assert.NotNull(grid);
-        Assert.Equal(9, grid.Length);
+        var service = new ScratchCardService();
+        service.SelectCard(10, 100.0);
+
+        var result = service.BuyCard(100.0, out string? errorMsg);
+
+        Assert.Null(errorMsg);
+        Assert.NotNull(result);
+        Assert.Equal(90.0, result.NewBalance);
+        Assert.Equal(10, result.Cost);
+
+        Assert.NotNull(service.Grid);
+        Assert.Equal(9, service.Grid.Length);
+        Assert.All(service.Grid, cell => Assert.NotNull(cell));
     }
+
     [Fact]
-    public void CalculateResult_NoWinningRows_PaysZero()
+    public void EvaluateGrid_NoWinningRows_PaysZero()
     {
-        using var database = new TemporaryDatabase();
-        var (component, session) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "selectedCost", 10);
-        ReflectionTestSupport.SetField(component, "totalWin", 0.0);
-        ReflectionTestSupport.SetField(component, "winningRows", new List<int>());
+        var service = new ScratchCardService();
+
+        typeof(ScratchCardService).GetProperty("SelectedCost")?.SetValue(service, 10);
+
         string[] losingGrid = {
-      "🍒", "🍋", "🍒",
-      "🔔", "⭐", "🔔",
-      "💎", "7️⃣", "💎"
-    };
-        ReflectionTestSupport.SetField(component, "grid", losingGrid);
-        ReflectionTestSupport.Invoke(component, "CalculateResult");
-        var totalWin = ReflectionTestSupport.GetField<double>(component, "totalWin");
-        var winningRows = ReflectionTestSupport.GetField<List<int>>(component, "winningRows");
-        Assert.Equal(0.0, totalWin);
-        Assert.Empty(winningRows);
-        Assert.Equal(100.0, session.CurrentPlayer!.Balance);
+            "🍒", "🍋", "🍒",
+            "🔔", "⭐", "🔔",
+            "💎", "7️⃣", "💎"
+        };
+        typeof(ScratchCardService).GetProperty("Grid")?.SetValue(service, losingGrid);
+
+        var result = service.EvaluateGrid();
+
+        Assert.Equal(0.0, result.TotalWin);
+        Assert.Empty(result.WinningRows);
+        Assert.Equal("Lost", result.BetStatus);
     }
+
     [Fact]
-    public void CalculateResult_SingleWinningRow_PaysCorrectMultiplier()
+    public void EvaluateGrid_SingleWinningRow_PaysCorrectMultiplier()
     {
-        using var database = new TemporaryDatabase();
-        var (component, session) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "selectedCost", 10);
+        var service = new ScratchCardService();
+        typeof(ScratchCardService).GetProperty("SelectedCost")?.SetValue(service, 10);
+
         string[] winningGrid = {
-      "🍒", "⭐", "🍒",
-      "🍋", "🍋", "🍋",
-      "💎", "7️⃣", "💎"
-    };
-        ReflectionTestSupport.SetField(component, "grid", winningGrid);
-        ReflectionTestSupport.Invoke(component, "CalculateResult");
-        var totalWin = ReflectionTestSupport.GetField<double>(component, "totalWin");
-        var winningRows = ReflectionTestSupport.GetField<List<int>>(component, "winningRows");
-        Assert.Equal(20.0, totalWin);
-        Assert.Single(winningRows);
-        Assert.Contains(1, winningRows);
-        Assert.Equal(120.0, session.CurrentPlayer!.Balance);
+            "🍒", "🍒", "🍒",
+            "🍋", "⭐", "🔔",
+            "💎", "7️⃣", "💎"
+        };
+        typeof(ScratchCardService).GetProperty("Grid")?.SetValue(service, winningGrid);
+
+        var result = service.EvaluateGrid();
+
+        Assert.Equal(15.0, result.TotalWin);
+        Assert.Single(result.WinningRows);
+        Assert.Contains(0, result.WinningRows);
+        Assert.Equal("Won", result.BetStatus);
     }
+
     [Fact]
-    public void CalculateResult_MultipleWinningRows_CalculatesSumCorrectly()
+    public void EvaluateGrid_MultipleWinningRows_CalculatesSumCorrectly()
     {
-        using var database = new TemporaryDatabase();
-        var (component, session) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "selectedCost", 5);
+        var service = new ScratchCardService();
+        typeof(ScratchCardService).GetProperty("SelectedCost")?.SetValue(service, 5);
+
         string[] multiWinGrid = {
-      "🍒", "🍒", "🍒",
-      "🍋", "7️⃣", "💎",
-      "⭐", "⭐", "⭐"
-    };
-        ReflectionTestSupport.SetField(component, "grid", multiWinGrid);
-        ReflectionTestSupport.Invoke(component, "CalculateResult");
-        var totalWin = ReflectionTestSupport.GetField<double>(component, "totalWin");
-        var winningRows = ReflectionTestSupport.GetField<List<int>>(component, "winningRows");
-        Assert.Equal(47.5, totalWin);
-        Assert.Equal(2, winningRows.Count);
-        Assert.Contains(0, winningRows);
-        Assert.Contains(2, winningRows);
-        Assert.Equal(147.5, session.CurrentPlayer!.Balance);
+            "🍒", "🍒", "🍒",
+            "🍋", "7️⃣", "💎",
+            "⭐", "⭐", "⭐"
+        };
+        typeof(ScratchCardService).GetProperty("Grid")?.SetValue(service, multiWinGrid);
+
+        var result = service.EvaluateGrid();
+
+        Assert.Equal(47.5, result.TotalWin);
+        Assert.Equal(2, result.WinningRows.Count);
+        Assert.Contains(0, result.WinningRows);
+        Assert.Contains(2, result.WinningRows);
+        Assert.Equal("Won", result.BetStatus);
     }
+
     [Fact]
-    public void PlayAgain_ResetsGameStateAndCost()
+    public void Reset_ClearsGameStateAndCost()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "selectedCost", 50);
-        ReflectionTestSupport.SetField(component, "errorMsg", "Some old error");
-        ReflectionTestSupport.SetField(component, "gameState", Enum.Parse(typeof(ScratchCard).GetNestedType("GameState", System.Reflection.BindingFlags.NonPublic)!, "Result"));
-        ReflectionTestSupport.Invoke(component, "PlayAgain");
-        var selectedCost = ReflectionTestSupport.GetField<int>(component, "selectedCost");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        var gameState = ReflectionTestSupport.GetField<object>(component, "gameState").ToString();
-        Assert.Equal(0, selectedCost);
-        Assert.Equal("", errorMsg);
-        Assert.Equal("SelectCard", gameState);
+        var service = new ScratchCardService();
+        service.SelectCard(50, 100.0);
+        service.BuyCard(100.0, out _);
+
+        service.Reset();
+
+        Assert.Equal(0, service.SelectedCost);
+        Assert.Equal(9, service.Grid.Length);
+        Assert.All(service.Grid, cell => Assert.Null(cell));
     }
-}
-public class DummyJSRuntime : IJSRuntime
-{
-    public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)
-      => new ValueTask<TValue>(default(TValue)!);
-    public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
-      => new ValueTask<TValue>(default(TValue)!);
 }
 
-public class SlotsComponentTests
+public class SlotsServiceTests
 {
-    private (Slots component, CasinoApp.Web.Services.SessionService session) SetupComponent(double initialBalance)
-    {
-        var component = new Slots();
-        var playerRepo = new PlayerRepository();
-        playerRepo.Create(new Player { Username = "TestUser", Email = "test@gmail.com", Password = "123", Balance = initialBalance });
-        var player = playerRepo.GetByUsername("TestUser");
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(player!);
-        var gameRepo = new GameRepository();
-        var game = gameRepo.GetByName("Slots");
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetMember(component, "PlayerRepo", playerRepo);
-        ReflectionTestSupport.SetMember(component, "BetRepo", new BetRepository());
-        ReflectionTestSupport.SetMember(component, "GameRepo", gameRepo);
-        ReflectionTestSupport.SetMember(component, "JS", new DummyJSRuntime());
-        if (game != null)
-        {
-            ReflectionTestSupport.SetField(component, "slotsGameId", game.Id);
-        }
-        return (component, sessionService);
-    }
-    #region 1. Betting & Engine Mechanics
-    [Fact]
-    public void SetBet_ValidInput_UpdatesBetAmount()
-    {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "isSpinning", false);
-        ReflectionTestSupport.Invoke(component, "SetBet", 25);
-        var betAmount = ReflectionTestSupport.GetField<int>(component, "betAmount");
-        Assert.Equal(25, betAmount);
-    }
     [Fact]
-    public void Spin_InsufficientBalance_ShowsErrorMessageAndRejectsSpin()
+    public void GenerateSpin_InsufficientBalance_ReturnsNullAndShowsError()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _) = SetupComponent(10.0);
-        ReflectionTestSupport.SetField(component, "betAmount", 50);
-        ReflectionTestSupport.SetField(component, "isSpinning", false);
-        ReflectionTestSupport.Invoke(component, "Spin");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        var isSpinning = ReflectionTestSupport.GetField<bool>(component, "isSpinning");
+        var service = new SlotsService();
+
+        var result = service.GenerateSpin(50, 10.0, out string? errorMsg);
+
+        Assert.Null(result);
         Assert.Equal("Balantă insuficientă!", errorMsg);
-        Assert.False(isSpinning);
     }
+
     [Fact]
-    public void Spin_ValidBalance_DeductsBalanceAndGeneratesGrid()
+    public void GenerateSpin_ValidBalance_DeductsBalanceAndGeneratesGrid()
     {
-        using var database = new TemporaryDatabase();
-        var (component, session) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "betAmount", 10);
-        ReflectionTestSupport.SetField(component, "isSpinning", false);
-        ReflectionTestSupport.Invoke(component, "Spin");
-        var isSpinning = ReflectionTestSupport.GetField<bool>(component, "isSpinning");
-        var resultGrid = ReflectionTestSupport.GetField<string[,]>(component, "resultGrid");
-        var errorMsg = ReflectionTestSupport.GetField<string>(component, "errorMsg");
-        Assert.True(isSpinning);
-        Assert.Equal("", errorMsg);
-        Assert.Equal(90.0, session.CurrentPlayer!.Balance);
-        Assert.NotNull(resultGrid);
-        Assert.Equal(5, resultGrid.GetLength(0));
-        Assert.Equal(3, resultGrid.GetLength(1));
+        var service = new SlotsService();
+
+        var result = service.GenerateSpin(10, 100.0, out string? errorMsg);
+
+        Assert.Null(errorMsg);
+        Assert.NotNull(result);
+        Assert.Equal(90.0, result.BalanceAfterBet);
+        Assert.Equal(10, result.BetAmount);
+
+        Assert.NotNull(result.FlatGrid);
+        Assert.Equal(15, result.FlatGrid.Length);
+
+        Assert.NotNull(service.ResultGrid);
+        Assert.Equal(5, service.ResultGrid.GetLength(0));
+        Assert.Equal(3, service.ResultGrid.GetLength(1));
     }
-    #endregion
-    #region 2. Payout Math (Data-Driven Test for all 105 possibilities)
-    private static readonly int[][] TestPaylines = new[]
-  {
-    new[] { 0, 0, 0, 0, 0 },
-    new[] { 1, 1, 1, 1, 1 },
-    new[] { 2, 2, 2, 2, 2 },
-    new[] { 2, 1, 0, 1, 2 },
-    new[] { 0, 1, 2, 1, 0 },
-  };
+
+    [Fact]
+    public void CopyResultToDisplay_TransfersGridState()
+    {
+        var service = new SlotsService();
+        service.GenerateSpin(10, 100.0, out _);
+
+        service.CopyResultToDisplay();
+
+        for (int r = 0; r < 5; r++)
+        {
+            for (int row = 0; row < 3; row++)
+            {
+                Assert.Equal(service.ResultGrid[r, row], service.DisplayGrid[r, row]);
+            }
+        }
+    }
+
+    private static readonly int[][] TestPaylines = new[]
+    {
+        new[] { 0, 0, 0, 0, 0 },
+        new[] { 1, 1, 1, 1, 1 },
+        new[] { 2, 2, 2, 2, 2 },
+        new[] { 2, 1, 0, 1, 2 },
+        new[] { 0, 1, 2, 1, 0 },
+    };
+
     public static IEnumerable<object[]> GetPayoutTestCases()
     {
         var symbols = new (string emoji, double mult3, double mult4, double mult5)[]
         {
-      ("🍒", 3, 5, 10),
-      ("🍋", 3, 5, 10),
-      ("🍊", 3, 5, 10),
-      ("⭐", 2, 5, 15),
-      ("🔔", 5, 10, 25),
-      ("💎", 10, 25, 50),
-      ("7️⃣", 25, 100, 200)
+            ("🍒", 3, 5, 10),
+            ("🍋", 3, 5, 10),
+            ("🍊", 3, 5, 10),
+            ("⭐", 2, 5, 15),
+            ("🔔", 5, 10, 25),
+            ("💎", 10, 25, 50),
+            ("7️⃣", 25, 100, 200)
         };
+
         for (int lineIndex = 0; lineIndex < 5; lineIndex++)
         {
             foreach (var sym in symbols)
@@ -792,120 +775,119 @@ public class SlotsComponentTests
             }
         }
     }
+
     [Theory]
     [MemberData(nameof(GetPayoutTestCases))]
     public void CalculateWins_EverySymbol_EveryLine_EveryLength_CalculatesCorrectPayout(
-      int lineIndex, string targetSymbol, int matchCount, double expectedMultiplier)
+        int lineIndex, string targetSymbol, int matchCount, double expectedMultiplier)
     {
-        using var database = new TemporaryDatabase();
-        var (component, session) = SetupComponent(100.0);
+        var service = new SlotsService();
         int betAmount = 10;
-        ReflectionTestSupport.SetField(component, "betAmount", betAmount);
+
         string[,] dummyGrid = new string[5, 3];
-        for (int c = 0; c < 5; c++)
+        for (int r = 0; r < 5; r++)
         {
-            for (int r = 0; r < 3; r++)
+            for (int row = 0; row < 3; row++)
             {
-                dummyGrid[c, r] = $"X_{c}_{r}";
+                dummyGrid[r, row] = $"X_{r}_{row}";
             }
         }
+
         int[] activeLine = TestPaylines[lineIndex];
         for (int c = 0; c < matchCount; c++)
         {
             dummyGrid[c, activeLine[c]] = targetSymbol;
         }
-        ReflectionTestSupport.SetField(component, "resultGrid", dummyGrid);
-        ReflectionTestSupport.Invoke(component, "CalculateWins");
+
+        typeof(SlotsService).GetProperty("ResultGrid")?.SetValue(service, dummyGrid);
+
+        var result = service.CalculateWins(betAmount);
+
         double expectedWin = expectedMultiplier * betAmount;
-        var totalWin = ReflectionTestSupport.GetField<double>(component, "totalWin");
-        Assert.Equal(expectedWin, totalWin);
-        Assert.Equal(100.0 + expectedWin, session.CurrentPlayer!.Balance);
+
+        Assert.Equal(expectedWin, result.TotalWin);
+        Assert.Equal("Won", result.BetStatus);
+        Assert.Single(result.WinLines);
+        Assert.Equal(targetSymbol, result.WinLines[0].Symbol);
+        Assert.Equal(matchCount, result.WinLines[0].MatchCount);
     }
-    #endregion
+
+    [Fact]
+    public void CalculateWins_NoMatches_ReturnsLostStatus()
+    {
+        var service = new SlotsService();
+
+        string[,] dummyGrid = new string[5, 3];
+        int counter = 0;
+        for (int r = 0; r < 5; r++)
+        {
+            for (int row = 0; row < 3; row++)
+            {
+                dummyGrid[r, row] = $"SYM_{counter++}";
+            }
+        }
+
+        typeof(SlotsService).GetProperty("ResultGrid")?.SetValue(service, dummyGrid);
+
+        var result = service.CalculateWins(10);
+
+        Assert.Equal(0, result.TotalWin);
+        Assert.Equal("Lost", result.BetStatus);
+        Assert.Empty(result.WinLines);
+        Assert.Empty(result.ActivePaylines);
+        Assert.Empty(result.WinCells);
+    }
 }
 
-public class WheelOfFortuneComponentTests
+public class WheelOfFortuneServiceTests
 {
-    private (WheelOfFortune component, CasinoApp.Web.Services.SessionService session, LocalStorageDummyJSRuntime jsRuntime) SetupComponent(double initialBalance)
-    {
-        var component = new WheelOfFortune();
-        var playerRepo = new PlayerRepository();
-        playerRepo.Create(new Player { Username = "TestUser", Email = "test@gmail.com", Password = "123", Balance = initialBalance });
-        var player = playerRepo.GetByUsername("TestUser");
-        var sessionService = new CasinoApp.Web.Services.SessionService();
-        sessionService.SetPlayer(player!);
-        var gameRepo = new GameRepository();
-        var game = gameRepo.GetByName("Wheel of Fortune");
-        var dummyJs = new LocalStorageDummyJSRuntime();
-        ReflectionTestSupport.SetMember(component, "Session", sessionService);
-        ReflectionTestSupport.SetMember(component, "PlayerRepo", playerRepo);
-        ReflectionTestSupport.SetMember(component, "BetRepo", new BetRepository());
-        ReflectionTestSupport.SetMember(component, "GameRepo", gameRepo);
-        ReflectionTestSupport.SetMember(component, "JS", dummyJs);
-        if (game != null)
-        {
-            ReflectionTestSupport.SetField(component, "wheelGameId", game.Id);
-        }
-        return (component, sessionService, dummyJs);
-    }
     [Fact]
-    public async Task CheckSpinStatus_WhenLocalStorageMatchesToday_SetsHasSpunTodayToTrue()
+    public void PrepareSpin_CalculatesRotationAndReturnsValidSlot()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _, jsRuntime) = SetupComponent(100.0);
-        jsRuntime.LocalStorageMockValue = DateTime.Today.ToString("yyyy-MM-dd");
-        var method = component.GetType().GetMethod("CheckSpinStatus", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var task = (Task)method!.Invoke(component, null)!;
-        await task;
-        var hasSpunToday = ReflectionTestSupport.GetField<bool>(component, "hasSpunToday");
-        Assert.True(hasSpunToday);
+        var service = new WheelOfFortuneService();
+
+        var setup = service.PrepareSpin();
+
+        Assert.InRange(setup.WinIndex, 0, service.Slots.Length - 1);
+        Assert.Equal(service.Slots[setup.WinIndex], setup.WonSlot);
+
+        Assert.True(setup.NewWheelRotation >= 2520.0);
+        Assert.Equal(setup.NewWheelRotation, service.CurrentRotation);
     }
+
     [Fact]
-    public async Task CheckSpinStatus_WhenLocalStorageIsEmpty_AllowsSpin()
+    public void ResolveSpin_MysteryPrize_ReturnsNoCashPrizeAndUnchangedBalance()
     {
-        using var database = new TemporaryDatabase();
-        var (component, _, jsRuntime) = SetupComponent(100.0);
-        jsRuntime.LocalStorageMockValue = null;
-        var method = component.GetType().GetMethod("CheckSpinStatus", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var task = (Task)method!.Invoke(component, null)!;
-        await task;
-        var hasSpunToday = ReflectionTestSupport.GetField<bool>(component, "hasSpunToday");
-        Assert.False(hasSpunToday);
+        var service = new WheelOfFortuneService();
+        var mysterySlot = service.Slots.First(s => s.IsMystery);
+        double startingBalance = 100.0;
+
+        var result = service.ResolveSpin(mysterySlot, startingBalance);
+
+        Assert.False(result.HasCashPrize);
+        Assert.Equal(startingBalance, result.NewBalance);
+        Assert.Equal("Won", result.BetStatus);
+        Assert.Equal("", result.ResultMsg);
     }
-    [Fact]
-    public void Spin_WhenHasSpunTodayIsTrue_RejectsSpin()
+
+    [Theory]
+    [InlineData(5, 100.0, 105.0)]
+    [InlineData(25, 0.0, 25.0)]
+    [InlineData(1000, 50.0, 1050.0)]
+    [InlineData(10000, 20.0, 10020.0)]
+    public void ResolveSpin_CashPrize_UpdatesBalanceAndReturnsMessage(double cashValue, double startingBalance, double expectedBalance)
     {
-        using var database = new TemporaryDatabase();
-        var (component, _, _) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "hasSpunToday", true);
-        ReflectionTestSupport.SetField(component, "isSpinning", false);
-        ReflectionTestSupport.Invoke(component, "Spin");
-        var isSpinning = ReflectionTestSupport.GetField<bool>(component, "isSpinning");
-        Assert.False(isSpinning);
-    }
-    [Fact]
-    public void Spin_WhenAlreadySpinning_RejectsSubsequentClicks()
-    {
-        using var database = new TemporaryDatabase();
-        var (component, _, _) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "hasSpunToday", false);
-        ReflectionTestSupport.SetField(component, "isSpinning", true);
-        ReflectionTestSupport.Invoke(component, "Spin");
-        var hasSpunToday = ReflectionTestSupport.GetField<bool>(component, "hasSpunToday");
-        Assert.False(hasSpunToday);
-    }
-    [Fact]
-    public void CloseReveal_ResetsUIStates()
-    {
-        using var database = new TemporaryDatabase();
-        var (component, _, _) = SetupComponent(100.0);
-        ReflectionTestSupport.SetField(component, "revealPhase", 4);
-        ReflectionTestSupport.SetField(component, "showResult", true);
-        ReflectionTestSupport.Invoke(component, "CloseReveal");
-        var revealPhase = ReflectionTestSupport.GetField<int>(component, "revealPhase");
-        var showResult = ReflectionTestSupport.GetField<bool>(component, "showResult");
-        Assert.Equal(0, revealPhase);
-        Assert.False(showResult);
+        var service = new WheelOfFortuneService();
+
+        var cashSlot = service.Slots.First(s => !s.IsMystery && s.CashValue == (decimal)cashValue);
+
+        var result = service.ResolveSpin(cashSlot, startingBalance);
+
+        Assert.True(result.HasCashPrize);
+        Assert.Equal(expectedBalance, result.NewBalance);
+        Assert.Equal("Won", result.BetStatus);
+
+        Assert.Contains(cashValue.ToString("N0"), result.ResultMsg);
     }
 }
 
