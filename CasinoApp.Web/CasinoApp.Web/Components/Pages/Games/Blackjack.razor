@@ -12,7 +12,6 @@
 
 <div class="bj-table">
 
-    @* ── DEALER ─────────────────────────────────────────────────────────── *@
     <div class="bj-zone dealer-zone">
         <div class="bj-zone-label">DEALER</div>
         <div class="bj-hand">
@@ -41,17 +40,21 @@
         {
             <div class="bj-score">
                 @if (gameState == GameState.Playing && !isDealerPlaying)
-                { @(BJ.GetHandValue(new List<Card>{ BJ.DealerHand[0] })) <span style="color:#555">+ ?</span> }
+                {
+                    @(BJ.GetHandValue(new List<Card> { BJ.DealerHand[0] }))
+                    <span style="color:#555">+ ?</span>
+                }
                 else
-                { @BJ.GetHandValue(BJ.DealerHand) }
+                {
+
+                    @BJ.GetHandValue(BJ.DealerHand)
+                }
             </div>
         }
     </div>
 
-    @* ── DIVIDER ─────────────────────────────────────────────────────────── *@
     <div class="bj-divider"></div>
 
-    @* ── RESULT BANNER ───────────────────────────────────────────────────── *@
     @if (gameState == GameState.Result)
     {
         <div class="bj-result @BJ.GetResultClass(resultMsg)">
@@ -73,7 +76,6 @@
         }
     }
 
-    @* ── INSURANCE PROMPT ────────────────────────────────────────────────── *@
     @if (BJ.IsOfferingInsurance)
     {
         <div class="bj-insurance-prompt">
@@ -89,14 +91,12 @@
         </div>
     }
 
-    @* ── PLAYER HANDS ─────────────────────────────────────────────────────── *@
     <div class="bj-zone player-zone">
 
         @if (BJ.HasSplit)
         {
             <div class="bj-split-hands">
 
-                @* Hand 1 *@
                 <div class="bj-split-slot @(!BJ.IsPlayingSplitHand && gameState == GameState.Playing ? "slot-active" : "slot-inactive")">
                     <div class="split-hand-label">
                         MANA 1 @(!BJ.IsPlayingSplitHand && gameState == GameState.Playing ? "◄" : "")
@@ -124,7 +124,6 @@
                     }
                 </div>
 
-                @* Hand 2 (split) *@
                 <div class="bj-split-slot @(BJ.IsPlayingSplitHand && gameState == GameState.Playing ? "slot-active" : "slot-inactive")">
                     <div class="split-hand-label">
                         MANA 2 @(BJ.IsPlayingSplitHand && gameState == GameState.Playing ? "◄" : "")
@@ -181,7 +180,6 @@
 
     </div>
 
-    @* ── SIDEBAR: balance + action buttons ───────────────────────────────── *@
     <div class="bj-sidebar">
 
         <div class="bj-bal">
@@ -197,14 +195,18 @@
         @if (gameState == GameState.Playing && !BJ.IsOfferingInsurance)
         {
             <div class="bj-sidebar-actions">
-                <button class="bj-btn hit"   @onclick="Hit"         disabled="@isDealerPlaying">HIT</button>
-                <button class="bj-btn stand" @onclick="Stand"       disabled="@isDealerPlaying">STAND</button>
+                <button class="bj-btn hit" @onclick="Hit" disabled="@isDealerPlaying">HIT</button>
+                <button class="bj-btn stand" @onclick="Stand" disabled="@isDealerPlaying">STAND</button>
                 <button class="bj-btn dbl @(!BJ.CanDouble(Session.CurrentPlayer!.Balance) ? "off" : "")"
                         @onclick="DoubleDown"
-                        disabled="@(!BJ.CanDouble(Session.CurrentPlayer!.Balance))">2×</button>
+                        disabled="@(!BJ.CanDouble(Session.CurrentPlayer!.Balance))">
+                    2×
+                </button>
                 <button class="bj-btn split-btn @(!BJ.CanSplit(Session.CurrentPlayer!.Balance) ? "off" : "")"
                         @onclick="DoSplit"
-                        disabled="@(!BJ.CanSplit(Session.CurrentPlayer!.Balance))">SPLIT</button>
+                        disabled="@(!BJ.CanSplit(Session.CurrentPlayer!.Balance))">
+                    SPLIT
+                </button>
             </div>
         }
 
@@ -213,7 +215,9 @@
             <div class="bj-sidebar-actions">
                 <button class="bj-ctrl clear"
                         @onclick="ClearBet"
-                        disabled="@(BJ.CurrentBet == 0 || isResetting)">✕ STERGE</button>
+                        disabled="@(BJ.CurrentBet == 0 || isResetting)">
+                    ✕ STERGE
+                </button>
                 <button class="bj-ctrl rebet"
                         @onclick="Rebet"
                         disabled="@(BJ.LastBet == 0 || Session.CurrentPlayer!.Balance < (double)BJ.LastBet || isResetting)">
@@ -233,7 +237,6 @@
 
     </div>
 
-    @* ── BET PANEL ────────────────────────────────────────────────────────── *@
     @if (gameState == GameState.Betting || gameState == GameState.Result)
     {
         <div class="bj-bet-panel">
@@ -282,29 +285,26 @@
 
 @code {
 
-    // ── Local UI-only enums and state ─────────────────────────────────────
     private enum GameState { Betting, Playing, Result }
 
     private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
 
-    private GameState gameState     = GameState.Betting;
-    private int       roundKey      = 0;
-    private bool      isDealerPlaying = false;
-    private bool      isResetting   = false;
+    private GameState gameState = GameState.Betting;
+    private int roundKey = 0;
+    private bool isDealerPlaying = false;
+    private bool isResetting = false;
 
-    // Result display (populated from EndResult, cleared on reset)
-    private string  resultMsg      = "";
-    private decimal resultWin      = 0;
-    private string  splitResultMsg = "";
+    private string resultMsg = "";
+    private decimal resultWin = 0;
+    private string splitResultMsg = "";
     private decimal splitResultWin = 0;
-    private string  errorMsg       = "";
+    private string errorMsg = "";
 
-    private int  blackjackGameId = 0;
-    private int? currentBetId   = null;
+    private int blackjackGameId = 0;
+    private int? currentBetId = null;
 
     private CancellationTokenSource? _resetCts;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += OnSessionChanged;
@@ -321,7 +321,6 @@
         _resetCts?.Dispose();
     }
 
-    // ── Betting ───────────────────────────────────────────────────────────
     private void AddChip(int v)
     {
         BJ.PlaceChip(v, Session.CurrentPlayer!.Balance, out string? err);
@@ -336,7 +335,6 @@
 
     private void Rebet() => BJ.Rebet(Session.CurrentPlayer!.Balance);
 
-    // ── DEAL ──────────────────────────────────────────────────────────────
     private async Task Deal()
     {
         if (isResetting || BJ.CurrentBet == 0) return;
@@ -346,14 +344,13 @@
 
         var result = BJ.StartDeal(Session.CurrentPlayer.Balance, blackjackGameId);
 
-        // Deduct bet from balance and persist
         currentBetId = BetRepo.Create(new Bet
         {
-            PlayerId  = Session.CurrentPlayer.Id,
-            GameId    = blackjackGameId,
+            PlayerId = Session.CurrentPlayer.Id,
+            GameId = blackjackGameId,
             SessionId = null,
-            Amount    = (double)result.BetAmount,
-            Status    = "Pending"
+            Amount = (double)result.BetAmount,
+            Status = "Pending"
         });
         Session.UpdateBalance(result.BalanceAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, result.BalanceAfterBet);
@@ -363,7 +360,6 @@
 
         if (result.NeedsInsurancePrompt)
         {
-            // Service already set IsOfferingInsurance = true — just refresh UI
             await InvokeAsync(StateHasChanged);
             return;
         }
@@ -386,7 +382,6 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    // ── INSURANCE ─────────────────────────────────────────────────────────
     private async Task TakeInsurance()
     {
         var r = BJ.TakeInsurance(Session.CurrentPlayer!.Balance);
@@ -422,7 +417,6 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    // ── HIT ───────────────────────────────────────────────────────────────
     private async Task Hit()
     {
         if (isDealerPlaying || BJ.IsOfferingInsurance) return;
@@ -430,12 +424,11 @@
         var r = BJ.Hit();
 
         if (r.ShouldSwitchToSplitHand) { await InvokeAsync(StateHasChanged); return; }
-        if (r.ShouldEndGame)           { await RunDealerPlay(); return; }
+        if (r.ShouldEndGame) { await RunDealerPlay(); return; }
 
         await InvokeAsync(StateHasChanged);
     }
 
-    // ── STAND ─────────────────────────────────────────────────────────────
     private async Task Stand()
     {
         if (BJ.IsOfferingInsurance) return;
@@ -443,10 +436,9 @@
         var r = BJ.Stand();
 
         if (r.ShouldSwitchToSplitHand) { await InvokeAsync(StateHasChanged); return; }
-        if (r.ShouldDealerPlay)        { await RunDealerPlay(); }
+        if (r.ShouldDealerPlay) { await RunDealerPlay(); }
     }
 
-    // ── DOUBLE DOWN ───────────────────────────────────────────────────────
     private async Task DoubleDown()
     {
         if (!BJ.CanDouble(Session.CurrentPlayer!.Balance)) return;
@@ -462,7 +454,6 @@
         if (r.PlayerBust || r.ShouldDealerPlay) { await RunDealerPlay(); }
     }
 
-    // ── SPLIT ─────────────────────────────────────────────────────────────
     private async Task DoSplit()
     {
         if (!BJ.CanSplit(Session.CurrentPlayer!.Balance)) return;
@@ -476,7 +467,6 @@
 
         if (r.IsAceSplit)
         {
-            // Ace split: both hands auto-stand, go straight to dealer
             await InvokeAsync(StateHasChanged);
             await Task.Delay(400);
             await RunDealerPlay();
@@ -486,19 +476,16 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    // ── DEALER PLAY LOOP ──────────────────────────────────────────────────
     private async Task RunDealerPlay()
     {
         isDealerPlaying = true;
         await InvokeAsync(StateHasChanged);
 
-        // Pause to reveal hidden card
         await Task.Delay(1000);
         await InvokeAsync(StateHasChanged);
 
         if (!BJ.AllPlayerHandsBust)
         {
-            // Draw one card at a time until dealer stands (score >= 17)
             while (BJ.DealerDrawNext() != null)
             {
                 await Task.Delay(1000);
@@ -510,12 +497,10 @@
         FinishGame();
     }
 
-    // ── END GAME ──────────────────────────────────────────────────────────
     private void FinishGame()
     {
         var r = BJ.EndGame();
 
-        // EndGame returns balance deltas from 0-base; add them to real balance
         double newBalance = Session.CurrentPlayer!.Balance + r.NewBalance;
         Session.UpdateBalance(newBalance);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, newBalance);
@@ -526,12 +511,12 @@
             currentBetId = null;
         }
 
-        resultMsg      = r.MainResultMsg;
-        resultWin      = r.MainResultWin;
+        resultMsg = r.MainResultMsg;
+        resultWin = r.MainResultWin;
         splitResultMsg = r.SplitResultMsg;
         splitResultWin = r.SplitResultWin;
 
-        gameState   = GameState.Result;
+        gameState = GameState.Result;
         isResetting = true;
 
         _resetCts?.Cancel();
@@ -549,20 +534,19 @@
             BJ.ResetRound();
             BJ.ResetBet();
 
-            resultMsg      = "";
+            resultMsg = "";
             splitResultMsg = "";
-            errorMsg       = "";
-            isResetting    = false;
-            gameState      = GameState.Betting;
+            errorMsg = "";
+            isResetting = false;
+            gameState = GameState.Betting;
 
             await InvokeAsync(StateHasChanged);
         }
-        catch (OperationCanceledException) { /* component disposed during reset — safe to ignore */ }
+        catch (OperationCanceledException) { }
     }
 }
 
 <style>
-    /* ── MASA ────────────────────────────────────────────────────────────── */
     .bj-table {
         position: relative;
         display: flex;
@@ -586,7 +570,6 @@
             background-image: repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.008) 40px, rgba(255,255,255,0.008) 41px), repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(255,255,255,0.008) 40px, rgba(255,255,255,0.008) 41px);
         }
 
-    /* ── ZONE ────────────────────────────────────────────────────────────── */
     .bj-zone {
         display: flex;
         flex-direction: column;
@@ -610,7 +593,6 @@
         color: rgba(212,175,55,0.4);
     }
 
-    /* ── LINIE DESPARTIRE ────────────────────────────────────────────────── */
     .bj-divider {
         width: 70%;
         height: 3px;
@@ -620,7 +602,6 @@
         margin: 6px 0;
     }
 
-    /* ── MAINI ───────────────────────────────────────────────────────────── */
     .bj-hand {
         display: flex;
         justify-content: center;
@@ -628,7 +609,6 @@
         align-items: center;
     }
 
-    /* ── CARTE ───────────────────────────────────────────────────────────── */
     .bj-card {
         position: relative;
         width: 72px;
@@ -714,7 +694,6 @@
         user-select: none;
     }
 
-    /* ── SCOR ────────────────────────────────────────────────────────────── */
     .bj-score {
         font-family: 'Bebas Neue', sans-serif;
         font-size: 1.1rem;
@@ -731,7 +710,6 @@
         border-color: rgba(231,76,60,0.4);
     }
 
-    /* ── BANNER REZULTAT ─────────────────────────────────────────────────── */
     .bj-result {
         display: flex;
         flex-direction: column;
@@ -791,7 +769,6 @@
         color: #e74c3c;
     }
 
-    /* ── SIDEBAR DREAPTA ─────────────────────────────────────────────────── */
     .bj-sidebar {
         position: absolute;
         right: 20px;
@@ -838,7 +815,6 @@
         text-align: right;
     }
 
-    /* Butoane HIT/STAND/2x/SPLIT + STERGE/REBET/DEAL — toate aceeasi latime */
     .bj-btn, .bj-ctrl, .bj-deal {
         width: 120px;
         height: 44px;
@@ -964,8 +940,6 @@
             box-shadow: none;
         }
 
-    /* ── PANEL PARIURI ───────────────────────────────────────────────────── */
-    /* 10 coloane × 52px + 9 gap-uri × 4px + padding 40px = ~596px */
     .bj-bet-panel {
         display: flex;
         flex-direction: column;
@@ -980,7 +954,6 @@
         margin-top: 8px;
     }
 
-    /* Stiva jetoane — inalta cat 10 chips stivuite */
     .bj-chip-stack-wrap {
         display: flex;
         flex-direction: column;
@@ -1051,7 +1024,6 @@
         letter-spacing: 1px;
     }
 
-    /* Culori jetoane stivuite */
     .chip-1 {
         background: linear-gradient(180deg,#aaa,#888);
         color: #fff;
@@ -1088,7 +1060,6 @@
         border: 1px solid #4a235a;
     }
 
-    /* Rand jetoane de selectat */
     .bj-chips-row {
         display: flex;
         gap: 10px;
@@ -1172,7 +1143,6 @@
         background: linear-gradient(160deg,#9b59b6,#6c3483);
     }
 
-    /* ── INSURANCE PROMPT ───────────────────────────────────────────────── */
     .bj-insurance-prompt {
         display: flex;
         flex-direction: column;
@@ -1205,7 +1175,6 @@
         margin-top: 4px;
     }
 
-    /* ── SPLIT HANDS (side-by-side) ─────────────────────────────────────── */
     .bj-split-hands {
         display: flex;
         flex-direction: row;

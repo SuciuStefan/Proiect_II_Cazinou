@@ -14,13 +14,11 @@
 
     <div class="rl-top-section">
 
-        @* ── ROATA ─── *@
         <div class="rl-wheel-wrap">
             <div class="rl-indicator">▼</div>
 
             <div class="rl-wheel-outer">
 
-                @* Build conic-gradient from wheel order *@
                 @{
                     var cgParts = new List<string>();
                     double seg = 360.0 / RL.WheelOrder.Length;
@@ -35,7 +33,6 @@
                     string bg = "conic-gradient(" + string.Join(",", cgParts) + ")";
                 }
 
-                @* Wheel rotator — angle driven by service *@
                 <div id="the-wheel-rotator" class="rl-wheel-rotator"
                      style="transform: rotate(@(currentWheelDeg.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))deg)">
 
@@ -62,12 +59,10 @@
                     </div>
                 </div>
 
-                @* Ball container — counter-rotates *@
                 <div class="rl-ball-container" style="transform: rotate(@(currentBallDeg.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))deg)">
                     <div class="rl-ball"></div>
                 </div>
 
-                @* Fixed center hub *@
                 <div class="rl-wheel-center">
                     @if (isSpinning)
                     {
@@ -87,7 +82,6 @@
             </div>
         </div>
 
-        @* ── PANOU DREAPTA ─── *@
         <div class="rl-right-panel">
 
             <div class="rl-info-box">
@@ -128,8 +122,15 @@
             {
                 string wc = totalWin > 0 ? "wb-win" : "wb-lose";
                 <div class="rl-win-box @wc">
-                    @if (totalWin > 0) { <span>🎉 +@totalWin.ToString("F2") RON</span> }
-                    else               { <span>😔 AI PIERDUT</span> }
+                    @if (totalWin > 0)
+                    {
+                        <span>🎉 +@totalWin.ToString("F2") RON</span>
+                    }
+                    else
+                    {
+
+                        <span>😔 AI PIERDUT</span>
+                    }
                 </div>
             }
 
@@ -146,7 +147,11 @@
                         <span class="spin-rot">◉</span>
                         <span>SE ÎNVÂRTE...</span>
                     }
-                    else { <span>⚡ SPIN</span> }
+                    else
+                    {
+
+                        <span>⚡ SPIN</span>
+                    }
                 </button>
             </div>
 
@@ -158,7 +163,6 @@
         </div>
     </div>
 
-    @* ── MASA DE PARIURI ─── *@
     <div class="rl-betting-table">
 
         @{
@@ -184,9 +188,9 @@
                         {
                             int num = (col - 1) * 3 + row;
                             string key = "num-" + num;
-                            string cc  = RL.IsRed(num) ? "cell-red" : "cell-black";
+                            string cc = RL.IsRed(num) ? "cell-red" : "cell-black";
                             string hit = (lastResult == num && !isSpinning && lastResult > 0) ? "cell-hit" : "";
-                            string hb  = RL.Bets.ContainsKey(key) ? "cell-has-bet" : "";
+                            string hb = RL.Bets.ContainsKey(key) ? "cell-has-bet" : "";
                             <div class="rl-cell @cc @hit @hb" @onclick="() => PlaceBet(key)">
                                 <span class="cell-num">@num</span>
                                 @if (RL.Bets.ContainsKey(key))
@@ -200,7 +204,7 @@
             </div>
 
             <div class="rl-col-btns">
-                @foreach (var (k, label) in new[] { (kCol3,"2:1"), (kCol2,"2:1"), (kCol1,"2:1") })
+                @foreach (var (k, label) in new[] { (kCol3, "2:1"), (kCol2, "2:1"), (kCol1, "2:1") })
                 {
                     string ck = k;
                     <div class="rl-col-btn @(RL.Bets.ContainsKey(ck) ? "col-has-bet" : "")" @onclick="() => PlaceBet(ck)">
@@ -219,7 +223,7 @@
             var kD1 = "doz1"; var kD2 = "doz2"; var kD3 = "doz3";
         }
         <div class="rl-dozens">
-            @foreach (var (k, label) in new[] { (kD1,"1st 12"), (kD2,"2nd 12"), (kD3,"3rd 12") })
+            @foreach (var (k, label) in new[] { (kD1, "1st 12"), (kD2, "2nd 12"), (kD3, "3rd 12") })
             {
                 string dk = k;
                 <div class="rl-outside-cell @(RL.Bets.ContainsKey(dk) ? "ob-active" : "")" @onclick="() => PlaceBet(dk)">
@@ -274,26 +278,23 @@
 
 @code {
 
-    // ── UI-only state ─────────────────────────────────────────────────────
     private readonly int[] chipDenoms = { 1, 5, 10, 25, 50, 100 };
-    private int    selectedChip = 5;
+    private int selectedChip = 5;
 
-    // Wheel/ball degrees are kept here (UI animation state, not game logic)
     private double currentWheelDeg = 0;
-    private double currentBallDeg  = 0;
+    private double currentBallDeg = 0;
 
-    private int     lastResult = -1;
-    private double  totalWin   = 0;
-    private bool    isSpinning = false;
-    private bool    showResult = false;
-    private string  errorMsg   = "";
+    private int lastResult = -1;
+    private double totalWin = 0;
+    private bool isSpinning = false;
+    private bool showResult = false;
+    private string errorMsg = "";
 
     private List<int> history = new();
 
-    private int  rouletteGameId = 0;
-    private int? currentBetId   = null;
+    private int rouletteGameId = 0;
+    private int? currentBetId = null;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += Refresh;
@@ -302,14 +303,13 @@
     }
 
     private void Refresh() => InvokeAsync(StateHasChanged);
-    public void Dispose()  => Session.OnChange -= Refresh;
+    public void Dispose() => Session.OnChange -= Refresh;
 
-    // ── Betting ───────────────────────────────────────────────────────────
     private void PlaceBet(string betKey)
     {
         if (isSpinning) return;
         RL.PlaceBet(betKey, selectedChip, Session.CurrentPlayer!.Balance, out string? err);
-        errorMsg   = err ?? "";
+        errorMsg = err ?? "";
         showResult = false;
     }
 
@@ -317,10 +317,9 @@
     {
         RL.ClearBets();
         showResult = false;
-        errorMsg   = "";
+        errorMsg = "";
     }
 
-    // ── SPIN ──────────────────────────────────────────────────────────────
     private async Task Spin()
     {
         if (isSpinning || RL.Bets.Count == 0) return;
@@ -328,33 +327,29 @@
         var setup = RL.PrepareSpin(Session.CurrentPlayer!.Balance, out string? err);
         if (err != null) { errorMsg = err; return; }
 
-        // Deduct total bet and persist
         currentBetId = BetRepo.Create(new Bet
         {
-            PlayerId  = Session.CurrentPlayer.Id,
-            GameId    = rouletteGameId,
+            PlayerId = Session.CurrentPlayer.Id,
+            GameId = rouletteGameId,
             SessionId = null,
-            Amount    = setup.TotalBet,
-            Status    = "Pending"
+            Amount = setup.TotalBet,
+            Status = "Pending"
         });
         Session.UpdateBalance(setup.BalanceAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, setup.BalanceAfterBet);
 
-        // Update animation targets — CSS transition handles the movement
         currentWheelDeg = setup.NewWheelDeg;
-        currentBallDeg  = setup.NewBallDeg;
-        lastResult      = setup.WinningNumber;
-        errorMsg        = "";
-        isSpinning      = true;
-        showResult      = false;
-        totalWin        = 0;
+        currentBallDeg = setup.NewBallDeg;
+        lastResult = setup.WinningNumber;
+        errorMsg = "";
+        isSpinning = true;
+        showResult = false;
+        totalWin = 0;
 
         StateHasChanged();
 
-        // Wait for CSS animation (4.5s transition + 0.2s buffer)
         await Task.Delay(4700);
 
-        // Resolve bets (service clears bets internally after resolving)
         var result = RL.ResolveSpin(lastResult, Session.CurrentPlayer!.Balance);
         totalWin = result.TotalWin;
 
@@ -401,206 +396,731 @@
         justify-content: center;
     }
 
-    /* ── ROATA ── */
-    .rl-wheel-wrap { display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; }
-    .rl-indicator  { color:#D4AF37; font-size:1.5rem; line-height:1; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.9)); margin-bottom:-4px; z-index:30; position:relative; }
+    .rl-wheel-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    .rl-indicator {
+        color: #D4AF37;
+        font-size: 1.5rem;
+        line-height: 1;
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.9));
+        margin-bottom: -4px;
+        z-index: 30;
+        position: relative;
+    }
 
     .rl-wheel-outer {
         position: relative;
-        width: 260px; height: 260px;
+        width: 260px;
+        height: 260px;
         border-radius: 50%;
         box-shadow: 0 0 0 5px #0a0a0a, 0 0 0 9px rgba(212,175,55,0.5), 0 0 0 12px #0a0a0a, 0 0 0 16px rgba(212,175,55,0.25), 0 0 60px rgba(0,0,0,0.9);
     }
 
     .rl-wheel-rotator {
-        position: absolute; inset: 0; border-radius: 50%; z-index: 10;
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        z-index: 10;
         transition: transform 4.5s cubic-bezier(0.15, 0.65, 0.1, 1.0);
     }
 
-    .rl-wheel-spinning { position: absolute; inset: 0; border-radius: 50%; }
+    .rl-wheel-spinning {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+    }
 
     .rl-seg-num {
-        position: absolute; top: 0; left: 50%; height: 50%;
-        transform-origin: bottom center; margin-left: -8px; width: 16px; padding-top: 8px;
-        text-align: center; font-family: 'Bebas Neue', sans-serif; font-size: 0.55rem;
-        color: rgba(255,255,255,0.85); line-height: 1; pointer-events: none;
+        position: absolute;
+        top: 0;
+        left: 50%;
+        height: 50%;
+        transform-origin: bottom center;
+        margin-left: -8px;
+        width: 16px;
+        padding-top: 8px;
+        text-align: center;
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 0.55rem;
+        color: rgba(255,255,255,0.85);
+        line-height: 1;
+        pointer-events: none;
     }
 
     .rl-divider {
-        position: absolute; top: 0; left: calc(50% - 0.5px);
-        width: 1px; height: 50%; transform-origin: bottom center;
-        background: rgba(0,0,0,0.5); pointer-events: none;
+        position: absolute;
+        top: 0;
+        left: calc(50% - 0.5px);
+        width: 1px;
+        height: 50%;
+        transform-origin: bottom center;
+        background: rgba(0,0,0,0.5);
+        pointer-events: none;
     }
 
-    .rl-ring { position: absolute; border-radius: 50%; pointer-events: none; border: 1px solid rgba(212,175,55,0.25); }
-    .rl-ring-outer { inset: 2px; }
-    .rl-ring-inner { inset: 25%; }
+    .rl-ring {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        border: 1px solid rgba(212,175,55,0.25);
+    }
+
+    .rl-ring-outer {
+        inset: 2px;
+    }
+
+    .rl-ring-inner {
+        inset: 25%;
+    }
 
     .rl-wheel-center {
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        width: 76px; height: 76px; border-radius: 50%;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
         background: radial-gradient(circle, #242424 0%, #0a0a0a 100%);
         border: 3px solid rgba(212,175,55,0.6);
         box-shadow: 0 0 20px rgba(0,0,0,0.9), inset 0 0 12px rgba(0,0,0,0.7), 0 0 0 4px #111;
-        display: flex; align-items: center; justify-content: center;
-        z-index: 20; pointer-events: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+        pointer-events: none;
     }
 
-    .rl-result-num { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 1px; }
-    .rn-green { color: #2ecc71; text-shadow: 0 0 14px rgba(46,204,113,0.9); }
-    .rn-red   { color: #e74c3c; text-shadow: 0 0 14px rgba(231,76,60,0.9); }
-    .rn-black { color: #f0e6d3; }
-    .rl-logo  { font-size: 1.8rem; color: rgba(212,175,55,0.3); }
+    .rl-result-num {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 2rem;
+        letter-spacing: 1px;
+    }
 
-    .rl-center-spin { width:20px; height:20px; position:relative; animation:centerPulse 0.8s ease-in-out infinite; }
-    .rl-center-dot  { width:12px; height:12px; border-radius:50%; background:#D4AF37; box-shadow:0 0 12px rgba(212,175,55,0.9); position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
-    @@keyframes centerPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.3);} }
-    @@keyframes spinRot { to{transform:rotate(360deg);} }
-    .spin-rot { animation:spinRot 0.5s linear infinite; display:inline-block; }
+    .rn-green {
+        color: #2ecc71;
+        text-shadow: 0 0 14px rgba(46,204,113,0.9);
+    }
 
-    /* ── PANOU DREAPTA ── */
-    .rl-right-panel { display:flex; flex-direction:column; gap:14px; flex:1; min-width:200px; max-width:280px; }
-    .rl-info-box { display:flex; flex-direction:column; gap:4px; }
-    .rl-lbl         { display:block; font-size:0.62rem; letter-spacing:3px; color:#444; font-weight:700; margin-bottom:4px; }
-    .rl-balance-val { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; color:#D4AF37; letter-spacing:2px; }
-    .rl-total-val   { font-family:'Bebas Neue',sans-serif; font-size:1.3rem; color:#f0e6d3; letter-spacing:1px; }
+    .rn-red {
+        color: #e74c3c;
+        text-shadow: 0 0 14px rgba(231,76,60,0.9);
+    }
 
-    .rl-chips-row { display:flex; gap:6px; flex-wrap:wrap; }
+    .rn-black {
+        color: #f0e6d3;
+    }
+
+    .rl-logo {
+        font-size: 1.8rem;
+        color: rgba(212,175,55,0.3);
+    }
+
+    .rl-center-spin {
+        width: 20px;
+        height: 20px;
+        position: relative;
+        animation: centerPulse 0.8s ease-in-out infinite;
+    }
+
+    .rl-center-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #D4AF37;
+        box-shadow: 0 0 12px rgba(212,175,55,0.9);
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%,-50%);
+    }
+
+    @@keyframes centerPulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.3);
+        }
+    }
+
+    @@keyframes spinRot {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .spin-rot {
+        animation: spinRot 0.5s linear infinite;
+        display: inline-block;
+    }
+
+    .rl-right-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: 1;
+        min-width: 200px;
+        max-width: 280px;
+    }
+
+    .rl-info-box {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .rl-lbl {
+        display: block;
+        font-size: 0.62rem;
+        letter-spacing: 3px;
+        color: #444;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .rl-balance-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.6rem;
+        color: #D4AF37;
+        letter-spacing: 2px;
+    }
+
+    .rl-total-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.3rem;
+        color: #f0e6d3;
+        letter-spacing: 1px;
+    }
+
+    .rl-chips-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
     .rl-chip {
-        width:40px; height:40px; border-radius:50%; border:none; cursor:pointer;
-        font-family:'Bebas Neue',sans-serif; font-size:0.82rem; color:white;
-        transition:all 0.15s; position:relative; box-shadow:0 3px 8px rgba(0,0,0,0.5);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.82rem;
+        color: white;
+        transition: all 0.15s;
+        position: relative;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.5);
     }
-    .rl-chip::before { content:''; position:absolute; inset:3px; border-radius:50%; border:1px dashed rgba(255,255,255,0.3); }
-    .rl-chip:hover:not(:disabled) { transform:scale(1.1); }
-    .rl-chip:disabled { opacity:0.4; cursor:not-allowed; }
-    .rl-chip.chip-sel { transform:scale(1.18); outline:2px solid #D4AF37; box-shadow:0 0 14px rgba(212,175,55,0.7); }
-    .chip-1   { background:linear-gradient(160deg,#bbb,#888); }
-    .chip-5   { background:linear-gradient(160deg,#e74c3c,#c0392b); }
-    .chip-10  { background:linear-gradient(160deg,#3498db,#2980b9); }
-    .chip-25  { background:linear-gradient(160deg,#27ae60,#1e8449); }
-    .chip-50  { background:linear-gradient(160deg,#e67e22,#d35400); }
-    .chip-100 { background:linear-gradient(160deg,#9b59b6,#6c3483); }
 
-    .rl-last-result { display:flex; flex-direction:column; gap:2px; padding:10px 14px; border-radius:8px; animation:resIn 0.3s ease; }
-    @@keyframes resIn { from{opacity:0;transform:scale(0.9);} to{opacity:1;transform:scale(1);} }
-    .lr-lbl { font-size:0.62rem; letter-spacing:3px; color:rgba(255,255,255,0.25); }
-    .lr-num { font-family:'Bebas Neue',sans-serif; font-size:2.5rem; letter-spacing:2px; line-height:1; }
-    .lr-props { font-size:0.72rem; letter-spacing:0.5px; opacity:0.7; }
-    .lr-green { background:rgba(39,174,96,0.12); border:1px solid rgba(39,174,96,0.4); color:#2ecc71; }
-    .lr-red   { background:rgba(196,30,58,0.12); border:1px solid rgba(196,30,58,0.4); color:#e74c3c; }
-    .lr-black { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#f0e6d3; }
+        .rl-chip::before {
+            content: '';
+            position: absolute;
+            inset: 3px;
+            border-radius: 50%;
+            border: 1px dashed rgba(255,255,255,0.3);
+        }
 
-    .rl-win-box { padding:10px 14px; border-radius:6px; font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:2px; animation:resIn 0.3s ease; }
-    .wb-win  { background:rgba(39,174,96,0.12); border:1px solid rgba(39,174,96,0.4); color:#2ecc71; }
-    .wb-lose { background:rgba(196,30,58,0.12); border:1px solid rgba(196,30,58,0.35); color:#e74c3c; }
+        .rl-chip:hover:not(:disabled) {
+            transform: scale(1.1);
+        }
 
-    .rl-btn-col { display:flex; flex-direction:column; gap:8px; }
+        .rl-chip:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .rl-chip.chip-sel {
+            transform: scale(1.18);
+            outline: 2px solid #D4AF37;
+            box-shadow: 0 0 14px rgba(212,175,55,0.7);
+        }
+
+    .chip-1 {
+        background: linear-gradient(160deg,#bbb,#888);
+    }
+
+    .chip-5 {
+        background: linear-gradient(160deg,#e74c3c,#c0392b);
+    }
+
+    .chip-10 {
+        background: linear-gradient(160deg,#3498db,#2980b9);
+    }
+
+    .chip-25 {
+        background: linear-gradient(160deg,#27ae60,#1e8449);
+    }
+
+    .chip-50 {
+        background: linear-gradient(160deg,#e67e22,#d35400);
+    }
+
+    .chip-100 {
+        background: linear-gradient(160deg,#9b59b6,#6c3483);
+    }
+
+    .rl-last-result {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        animation: resIn 0.3s ease;
+    }
+
+    @@keyframes resIn {
+        from {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    .lr-lbl {
+        font-size: 0.62rem;
+        letter-spacing: 3px;
+        color: rgba(255,255,255,0.25);
+    }
+
+    .lr-num {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 2.5rem;
+        letter-spacing: 2px;
+        line-height: 1;
+    }
+
+    .lr-props {
+        font-size: 0.72rem;
+        letter-spacing: 0.5px;
+        opacity: 0.7;
+    }
+
+    .lr-green {
+        background: rgba(39,174,96,0.12);
+        border: 1px solid rgba(39,174,96,0.4);
+        color: #2ecc71;
+    }
+
+    .lr-red {
+        background: rgba(196,30,58,0.12);
+        border: 1px solid rgba(196,30,58,0.4);
+        color: #e74c3c;
+    }
+
+    .lr-black {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: #f0e6d3;
+    }
+
+    .rl-win-box {
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.1rem;
+        letter-spacing: 2px;
+        animation: resIn 0.3s ease;
+    }
+
+    .wb-win {
+        background: rgba(39,174,96,0.12);
+        border: 1px solid rgba(39,174,96,0.4);
+        color: #2ecc71;
+    }
+
+    .wb-lose {
+        background: rgba(196,30,58,0.12);
+        border: 1px solid rgba(196,30,58,0.35);
+        color: #e74c3c;
+    }
+
+    .rl-btn-col {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
     .rl-clear-btn {
-        padding:8px 14px; background:transparent; border:1px solid rgba(255,255,255,0.1); border-radius:4px;
-        font-family:'Rajdhani',sans-serif; font-size:0.8rem; font-weight:700; letter-spacing:1.5px; color:#555; cursor:pointer; transition:all 0.2s;
+        padding: 8px 14px;
+        background: transparent;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 4px;
+        font-family: 'Rajdhani',sans-serif;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        color: #555;
+        cursor: pointer;
+        transition: all 0.2s;
     }
-    .rl-clear-btn:hover:not(:disabled) { border-color:rgba(231,76,60,0.5); color:#e74c3c; }
-    .rl-clear-btn:disabled { opacity:0.3; cursor:not-allowed; }
+
+        .rl-clear-btn:hover:not(:disabled) {
+            border-color: rgba(231,76,60,0.5);
+            color: #e74c3c;
+        }
+
+        .rl-clear-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
 
     .rl-spin-btn {
-        padding:14px; background:linear-gradient(135deg,#8B0000,#C41E3A); color:white; border:none; border-radius:6px;
-        font-family:'Bebas Neue',sans-serif; font-size:1.3rem; letter-spacing:4px; cursor:pointer; transition:all 0.2s;
-        box-shadow:0 6px 20px rgba(196,30,58,0.4); display:flex; align-items:center; justify-content:center; gap:10px;
+        padding: 14px;
+        background: linear-gradient(135deg,#8B0000,#C41E3A);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.3rem;
+        letter-spacing: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 6px 20px rgba(196,30,58,0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
     }
-    .rl-spin-btn:hover:not(:disabled):not(.spin-off) { background:linear-gradient(135deg,#C41E3A,#e8203d); transform:translateY(-2px); box-shadow:0 10px 28px rgba(196,30,58,0.6); }
-    .rl-spin-btn.spin-off, .rl-spin-btn:disabled { opacity:0.35; cursor:not-allowed; transform:none; background:#222; box-shadow:none; }
-    .rl-error { color:#e74c3c; font-size:0.8rem; }
 
-    /* ── MASA ── */
+        .rl-spin-btn:hover:not(:disabled):not(.spin-off) {
+            background: linear-gradient(135deg,#C41E3A,#e8203d);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(196,30,58,0.6);
+        }
+
+        .rl-spin-btn.spin-off, .rl-spin-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none;
+            background: #222;
+            box-shadow: none;
+        }
+
+    .rl-error {
+        color: #e74c3c;
+        font-size: 0.8rem;
+    }
+
     .rl-betting-table {
-        width:100%; max-width:840px; background:#0c220c;
-        border:1px solid rgba(212,175,55,0.2); border-radius:10px; padding:10px;
-        box-shadow:0 0 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
-        display:flex; flex-direction:column; gap:5px;
+        width: 100%;
+        max-width: 840px;
+        background: #0c220c;
+        border: 1px solid rgba(212,175,55,0.2);
+        border-radius: 10px;
+        padding: 10px;
+        box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
     }
 
-    .rl-number-section { display:flex; gap:5px; align-items:stretch; margin-bottom:2px; }
-    .rl-numbers-grid   { display:flex; gap:3px; flex:1; }
-    .rl-num-col        { display:flex; flex-direction:column; gap:3px; flex:1; }
+    .rl-number-section {
+        display: flex;
+        gap: 5px;
+        align-items: stretch;
+        margin-bottom: 2px;
+    }
+
+    .rl-numbers-grid {
+        display: flex;
+        gap: 3px;
+        flex: 1;
+    }
+
+    .rl-num-col {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        flex: 1;
+    }
 
     .rl-cell {
-        position:relative; min-height:50px; border-radius:5px; cursor:pointer;
-        display:flex; flex-direction:column; align-items:center; justify-content:center;
-        border:1px solid rgba(255,255,255,0.07); transition:all 0.12s; user-select:none;
+        position: relative;
+        min-height: 50px;
+        border-radius: 5px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255,255,255,0.07);
+        transition: all 0.12s;
+        user-select: none;
     }
-    .rl-cell:hover { transform:scale(1.07); z-index:2; box-shadow:0 4px 14px rgba(0,0,0,0.7); }
-    .cell-red   { background:linear-gradient(160deg,#6b1212,#4a0d0d); }
-    .cell-red:hover { background:linear-gradient(160deg,#c0392b,#922b21); }
-    .cell-black { background:linear-gradient(160deg,#181818,#0e0e0e); }
-    .cell-black:hover { background:linear-gradient(160deg,#2a2a2a,#1a1a1a); }
-    .cell-hit   { animation:cellHit 0.8s ease-in-out infinite alternate; border-color:#D4AF37 !important; z-index:3; }
-    @@keyframes cellHit { from{box-shadow:0 0 6px rgba(212,175,55,0.4);} to{box-shadow:0 0 22px rgba(212,175,55,1);} }
-    .cell-has-bet { border-color:rgba(212,175,55,0.5) !important; }
-    .cell-num   { font-family:'Bebas Neue',sans-serif; font-size:0.95rem; letter-spacing:1px; color:rgba(255,255,255,0.9); line-height:1; }
+
+        .rl-cell:hover {
+            transform: scale(1.07);
+            z-index: 2;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.7);
+        }
+
+    .cell-red {
+        background: linear-gradient(160deg,#6b1212,#4a0d0d);
+    }
+
+        .cell-red:hover {
+            background: linear-gradient(160deg,#c0392b,#922b21);
+        }
+
+    .cell-black {
+        background: linear-gradient(160deg,#181818,#0e0e0e);
+    }
+
+        .cell-black:hover {
+            background: linear-gradient(160deg,#2a2a2a,#1a1a1a);
+        }
+
+    .cell-hit {
+        animation: cellHit 0.8s ease-in-out infinite alternate;
+        border-color: #D4AF37 !important;
+        z-index: 3;
+    }
+
+    @@keyframes cellHit {
+        from {
+            box-shadow: 0 0 6px rgba(212,175,55,0.4);
+        }
+
+        to {
+            box-shadow: 0 0 22px rgba(212,175,55,1);
+        }
+    }
+
+    .cell-has-bet {
+        border-color: rgba(212,175,55,0.5) !important;
+    }
+
+    .cell-num {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.95rem;
+        letter-spacing: 1px;
+        color: rgba(255,255,255,0.9);
+        line-height: 1;
+    }
 
     .cell-chip {
-        width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-        font-family:'Bebas Neue',sans-serif; font-size:0.6rem; font-weight:700; color:white;
-        box-shadow:0 2px 5px rgba(0,0,0,0.7); position:absolute; bottom:2px; right:2px; z-index:5;
-        border:1px dashed rgba(255,255,255,0.4);
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.6rem;
+        font-weight: 700;
+        color: white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.7);
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        z-index: 5;
+        border: 1px dashed rgba(255,255,255,0.4);
     }
 
-    .rl-col-btns { width:48px; display:flex; flex-direction:column; gap:3px; flex-shrink:0; }
-    .rl-col-btn {
-        flex:1; background:rgba(212,175,55,0.06); border:1px solid rgba(212,175,55,0.18); border-radius:4px;
-        display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:700;
-        letter-spacing:1px; color:rgba(212,175,55,0.6); cursor:pointer; transition:all 0.15s; user-select:none; position:relative;
+    .rl-col-btns {
+        width: 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        flex-shrink: 0;
     }
-    .rl-col-btn:hover { background:rgba(212,175,55,0.14); color:#D4AF37; }
-    .rl-col-btn.col-has-bet { border-color:rgba(212,175,55,0.5); color:#D4AF37; background:rgba(212,175,55,0.1); }
+
+    .rl-col-btn {
+        flex: 1;
+        background: rgba(212,175,55,0.06);
+        border: 1px solid rgba(212,175,55,0.18);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: rgba(212,175,55,0.6);
+        cursor: pointer;
+        transition: all 0.15s;
+        user-select: none;
+        position: relative;
+    }
+
+        .rl-col-btn:hover {
+            background: rgba(212,175,55,0.14);
+            color: #D4AF37;
+        }
+
+        .rl-col-btn.col-has-bet {
+            border-color: rgba(212,175,55,0.5);
+            color: #D4AF37;
+            background: rgba(212,175,55,0.1);
+        }
 
     .cell-zero {
-        width:48px; background:linear-gradient(160deg,#145a14,#1e8449); border:1px solid rgba(255,255,255,0.15);
-        border-radius:6px; cursor:pointer; display:flex; flex-direction:column; align-items:center;
-        justify-content:center; gap:2px; position:relative; transition:all 0.15s; flex-shrink:0;
+        width: 48px;
+        background: linear-gradient(160deg,#145a14,#1e8449);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        position: relative;
+        transition: all 0.15s;
+        flex-shrink: 0;
     }
-    .cell-zero:hover { background:linear-gradient(160deg,#1e8449,#27ae60); transform:scale(1.04); }
 
-    .rl-dozens, .rl-outside { display:flex; gap:4px; }
+        .cell-zero:hover {
+            background: linear-gradient(160deg,#1e8449,#27ae60);
+            transform: scale(1.04);
+        }
+
+    .rl-dozens, .rl-outside {
+        display: flex;
+        gap: 4px;
+    }
+
     .rl-outside-cell {
-        position:relative; flex:1; padding:9px 4px; text-align:center;
-        background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:5px;
-        font-size:0.72rem; font-weight:700; letter-spacing:1px; color:#666; cursor:pointer; transition:all 0.15s; user-select:none;
+        position: relative;
+        flex: 1;
+        padding: 9px 4px;
+        text-align: center;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 5px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: #666;
+        cursor: pointer;
+        transition: all 0.15s;
+        user-select: none;
     }
-    .rl-outside-cell:hover { background:rgba(255,255,255,0.09); color:#f0e6d3; }
-    .rl-outside-cell.ob-active { border-color:rgba(212,175,55,0.5); color:#D4AF37; background:rgba(212,175,55,0.08); }
-    .ob-red   { background:rgba(196,30,58,0.1); color:#c0392b; border-color:rgba(196,30,58,0.25); }
-    .ob-red:hover { background:rgba(196,30,58,0.2); color:#e74c3c; }
-    .ob-black { background:rgba(20,20,20,0.6); color:#888; }
-    .ob-black:hover { background:rgba(40,40,40,0.8); color:#aaa; }
 
-    .rl-history { display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:center; }
-    .rl-hist-lbl { font-size:0.62rem; letter-spacing:2px; color:#333; font-weight:700; }
-    .rl-hist-num {
-        width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-        font-family:'Bebas Neue',sans-serif; font-size:0.82rem; border:1px solid rgba(255,255,255,0.08);
+        .rl-outside-cell:hover {
+            background: rgba(255,255,255,0.09);
+            color: #f0e6d3;
+        }
+
+        .rl-outside-cell.ob-active {
+            border-color: rgba(212,175,55,0.5);
+            color: #D4AF37;
+            background: rgba(212,175,55,0.08);
+        }
+
+    .ob-red {
+        background: rgba(196,30,58,0.1);
+        color: #c0392b;
+        border-color: rgba(196,30,58,0.25);
     }
-    .hn-green { background:#163c16; color:#2ecc71; }
-    .hn-red   { background:#3c1616; color:#e74c3c; }
-    .hn-black { background:#1a1a1a; color:#777; }
+
+        .ob-red:hover {
+            background: rgba(196,30,58,0.2);
+            color: #e74c3c;
+        }
+
+    .ob-black {
+        background: rgba(20,20,20,0.6);
+        color: #888;
+    }
+
+        .ob-black:hover {
+            background: rgba(40,40,40,0.8);
+            color: #aaa;
+        }
+
+    .rl-history {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .rl-hist-lbl {
+        font-size: 0.62rem;
+        letter-spacing: 2px;
+        color: #333;
+        font-weight: 700;
+    }
+
+    .rl-hist-num {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.82rem;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .hn-green {
+        background: #163c16;
+        color: #2ecc71;
+    }
+
+    .hn-red {
+        background: #3c1616;
+        color: #e74c3c;
+    }
+
+    .hn-black {
+        background: #1a1a1a;
+        color: #777;
+    }
 
     @@media (max-width:600px) {
-        .rl-wheel-outer { width:200px; height:200px; }
-        .rl-cell { min-height:40px; }
-        .cell-num { font-size:0.8rem; }
-        .rl-outside-cell { font-size:0.65rem; padding:7px 2px; }
+        .rl-wheel-outer {
+            width: 200px;
+            height: 200px;
+        }
+
+        .rl-cell {
+            min-height: 40px;
+        }
+
+        .cell-num {
+            font-size: 0.8rem;
+        }
+
+        .rl-outside-cell {
+            font-size: 0.65rem;
+            padding: 7px 2px;
+        }
     }
 
-    /* ── BILA ── */
     .rl-ball-container {
-        position:absolute; inset:0; border-radius:50%; pointer-events:none; z-index:15;
-        transition:transform 4.5s cubic-bezier(0.15, 0.65, 0.1, 1.0);
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 15;
+        transition: transform 4.5s cubic-bezier(0.15, 0.65, 0.1, 1.0);
     }
+
     .rl-ball {
-        position:absolute; top:24px; left:50%; transform:translateX(-50%);
-        width:12px; height:12px;
-        background:radial-gradient(circle at 35% 35%, #ffffff, #d4d4d4 40%, #737373 80%);
-        border-radius:50%; box-shadow:2px 2px 5px rgba(0,0,0,0.8), inset -1px -1px 3px rgba(0,0,0,0.5);
+        position: absolute;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 12px;
+        height: 12px;
+        background: radial-gradient(circle at 35% 35%, #ffffff, #d4d4d4 40%, #737373 80%);
+        border-radius: 50%;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.8), inset -1px -1px 3px rgba(0,0,0,0.5);
     }
 </style>

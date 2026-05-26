@@ -1,62 +1,45 @@
-// CasinoApp.BusinessLogic/Services/ScratchCardService.cs
-//
-// All ScratchCard game logic extracted from ScratchCard.razor.
-// Grid generation, win calculation, symbol/card data — all here.
-//
-// Register in Program.cs:
-//   builder.Services.AddScoped<IScratchCardService, ScratchCardService>();
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace CasinoApp.BusinessLogic.Services
 {
-    // ── Public data types ─────────────────────────────────────────────────────
     public record CardOption(int Cost, string Name, string Emoji, int Jackpot);
     public record ScratchSymbol(string Emoji, double Multiplier);
 
     public record ScratchResult(
-        double    TotalWin,
+        double TotalWin,
         List<int> WinningRows,
-        string    BetStatus     // "Won" | "Lost"
+        string BetStatus
     );
 
     public interface IScratchCardService
     {
-        // Static data — used by Razor for rendering the card picker and result
-        IReadOnlyList<CardOption>   CardOptions { get; }
-        IReadOnlyList<ScratchSymbol> Symbols    { get; }
+        IReadOnlyList<CardOption> CardOptions { get; }
+        IReadOnlyList<ScratchSymbol> Symbols { get; }
 
-        // Current round state
-        string[]  Grid         { get; }
-        int       SelectedCost { get; }
+        string[] Grid { get; }
+        int SelectedCost { get; }
 
-        // Called when player picks a card tier
         void SelectCard(int cost, double playerBalance);
 
-        // Called when player buys — generates the hidden grid
         BuyResult BuyCard(double playerBalance, out string? error);
 
-        // Called when all cells are scratched — evaluates and returns result
         ScratchResult EvaluateGrid();
 
-        // Helpers for the Result screen
         string GetRowSymbol(int row);
         double GetRowWin(int row);
 
-        // Reset between rounds
         void Reset();
     }
 
     public record BuyResult(
         double NewBalance,
-        int    Cost
+        int Cost
     );
 
     public class ScratchCardService : IScratchCardService
     {
-        // ── Static data ───────────────────────────────────────────────────────
         public IReadOnlyList<CardOption> CardOptions { get; } = new List<CardOption>
         {
             new(5,  "BRONZ",  "🥉", 250),
@@ -74,20 +57,17 @@ namespace CasinoApp.BusinessLogic.Services
             new("7️⃣", 50.0),
         };
 
-        // ── Round state ───────────────────────────────────────────────────────
-        public string[] Grid         { get; private set; } = new string[9];
-        public int      SelectedCost { get; private set; } = 0;
+        public string[] Grid { get; private set; } = new string[9];
+        public int SelectedCost { get; private set; } = 0;
 
         private readonly Random _rng = new();
 
-        // ── Card selection ────────────────────────────────────────────────────
         public void SelectCard(int cost, double playerBalance)
         {
             if (playerBalance < cost) return;
             SelectedCost = cost;
         }
 
-        // ── Buy — deduction is done by Razor, this just generates the grid ───
         public BuyResult BuyCard(double playerBalance, out string? error)
         {
             error = null;
@@ -107,11 +87,10 @@ namespace CasinoApp.BusinessLogic.Services
 
             return new BuyResult(
                 NewBalance: playerBalance - SelectedCost,
-                Cost:       SelectedCost
+                Cost: SelectedCost
             );
         }
 
-        // ── Evaluate ──────────────────────────────────────────────────────────
         public ScratchResult EvaluateGrid()
         {
             var winningRows = new List<int>();
@@ -126,19 +105,18 @@ namespace CasinoApp.BusinessLogic.Services
                 if (a == b && b == c)
                 {
                     winningRows.Add(row);
-                    var sym  = Symbols.First(s => s.Emoji == a);
+                    var sym = Symbols.First(s => s.Emoji == a);
                     totalWin += sym.Multiplier * SelectedCost;
                 }
             }
 
             return new ScratchResult(
-                TotalWin:    totalWin,
+                TotalWin: totalWin,
                 WinningRows: winningRows,
-                BetStatus:   totalWin > 0 ? "Won" : "Lost"
+                BetStatus: totalWin > 0 ? "Won" : "Lost"
             );
         }
 
-        // ── Result screen helpers ─────────────────────────────────────────────
         public string GetRowSymbol(int row) => Grid[row * 3];
 
         public double GetRowWin(int row)
@@ -147,26 +125,22 @@ namespace CasinoApp.BusinessLogic.Services
             return sym?.Multiplier * SelectedCost ?? 0;
         }
 
-        // ── Reset ─────────────────────────────────────────────────────────────
         public void Reset()
         {
             SelectedCost = 0;
-            Grid         = new string[9];
+            Grid = new string[9];
         }
 
-        // ── Private grid generation ───────────────────────────────────────────
         private void GenerateGrid()
         {
             Grid = new string[9];
 
-            // Win probability by ticket tier
             double winChance = SelectedCost switch { 5 => 0.32, 10 => 0.38, 50 => 0.45, _ => 0.33 };
 
             int winCount = _rng.NextDouble() < winChance
                 ? (_rng.NextDouble() < 0.08 ? 2 : _rng.NextDouble() < 0.01 ? 3 : 1)
                 : 0;
 
-            // Shuffle row indices and pick which rows win
             var rows = new List<int> { 0, 1, 2 };
             for (int i = rows.Count - 1; i > 0; i--)
             {
@@ -180,40 +154,39 @@ namespace CasinoApp.BusinessLogic.Services
                 if (winRows.Contains(row))
                 {
                     var sym = PickWinningSymbol();
-                    Grid[row * 3]     = sym.Emoji;
+                    Grid[row * 3] = sym.Emoji;
                     Grid[row * 3 + 1] = sym.Emoji;
                     Grid[row * 3 + 2] = sym.Emoji;
                 }
                 else
                 {
-                    // Guarantee all three are not the same
                     string a, b, c;
-                    do {
+                    do
+                    {
                         a = Symbols[_rng.Next(Symbols.Count)].Emoji;
                         b = Symbols[_rng.Next(Symbols.Count)].Emoji;
                         c = Symbols[_rng.Next(Symbols.Count)].Emoji;
                     } while (a == b && b == c);
 
-                    Grid[row * 3]     = a;
+                    Grid[row * 3] = a;
                     Grid[row * 3 + 1] = b;
                     Grid[row * 3 + 2] = c;
                 }
             }
         }
 
-        // Weighted symbol picker — better symbols are rarer on cheaper cards
         private ScratchSymbol PickWinningSymbol()
         {
             int[] weights = SelectedCost switch
             {
                 50 => new[] { 40, 24, 16, 11, 7, 2 },
-                10 => new[] { 46, 25, 14,  9, 5, 1 },
-                _  => new[] { 50, 26, 13,  7, 3, 1 },
+                10 => new[] { 46, 25, 14, 9, 5, 1 },
+                _ => new[] { 50, 26, 13, 7, 3, 1 },
             };
 
             int total = weights.Sum();
-            int pick  = _rng.Next(total);
-            int cum   = 0;
+            int pick = _rng.Next(total);
+            int cum = 0;
 
             for (int i = 0; i < weights.Length; i++)
             {

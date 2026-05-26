@@ -1,80 +1,63 @@
-// CasinoApp.BusinessLogic/Services/MinesService.cs
-//
-// All Mines game logic extracted from Mines.razor.
-// Handles mine placement, cell reveal, multiplier math, cash out.
-//
-// Register in Program.cs:
-//   builder.Services.AddScoped<IMinesService, MinesService>();
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace CasinoApp.BusinessLogic.Services
 {
-    // ── Cell / Game state enums (shared with Razor via using) ────────────────
-    public enum MinesCellState  { Hidden, Safe, Mine, MineBoom, SafeUnrevealed }
-    public enum MinesGameState  { Idle, Playing, GameOver, CashedOut }
-
-    // ── Return objects ────────────────────────────────────────────────────────
+    public enum MinesCellState { Hidden, Safe, Mine, MineBoom, SafeUnrevealed }
+    public enum MinesGameState { Idle, Playing, GameOver, CashedOut }
 
     public record StartResult(
-        double  BalanceAfterBet,
+        double BalanceAfterBet,
         decimal BetAmount
     );
 
     public record RevealResult(
-        bool    HitMine,
-        bool    AutoCashOut,       // true when last safe cell revealed
-        double  NewBalance,        // set when AutoCashOut or HitMine (lost = same, won = +cashout)
+        bool HitMine,
+        bool AutoCashOut,
+        double NewBalance,
         decimal CashOutWin,
-        string  BetStatus          // "Lost" | "Won" | "Pending"
+        string BetStatus
     );
 
     public record CashOutResult(
         decimal CashOutWin,
-        double  NewBalance
+        double NewBalance
     );
 
     public interface IMinesService
     {
-        // ── Read-only state ───────────────────────────────────────────────────
-        MinesGameState          GameState         { get; }
-        MinesCellState[]        Cells             { get; }
-        int                     SafeRevealed      { get; }
-        double                  CurrentMultiplier { get; }
-        decimal                 CurrentBet        { get; }
-        decimal                 LastBet           { get; }
-        decimal                 CashOutWin        { get; }
-        int                     GridSize          { get; }
-        int                     MineCount         { get; }
-        int                     Cols              { get; }
-        int                     MaxMines          { get; }
+        MinesGameState GameState { get; }
+        MinesCellState[] Cells { get; }
+        int SafeRevealed { get; }
+        double CurrentMultiplier { get; }
+        decimal CurrentBet { get; }
+        decimal LastBet { get; }
+        decimal CashOutWin { get; }
+        int GridSize { get; }
+        int MineCount { get; }
+        int Cols { get; }
+        int MaxMines { get; }
 
-        // ── Config (before game starts) ───────────────────────────────────────
         void SetGridSize(int gs);
         void SetMineCount(int mc);
 
-        // ── Betting ───────────────────────────────────────────────────────────
-        void    AddChip(int denomination, double playerBalance, out string? error);
-        void    ClearBet();
-        void    HalfBet();
-        void    DoubleBet(double playerBalance, out string? error);
-        void    Rebet(double playerBalance);
-        bool    CanStart(double playerBalance);
+        void AddChip(int denomination, double playerBalance, out string? error);
+        void ClearBet();
+        void HalfBet();
+        void DoubleBet(double playerBalance, out string? error);
+        void Rebet(double playerBalance);
+        bool CanStart(double playerBalance);
 
-        // ── Round flow ────────────────────────────────────────────────────────
-        StartResult  StartGame(double playerBalance);
+        StartResult StartGame(double playerBalance);
         RevealResult RevealCell(int idx, double currentBalance);
         CashOutResult CashOut(double currentBalance);
-        void         NewRound();
+        void NewRound();
 
-        // ── Multiplier helpers ────────────────────────────────────────────────
         double GetMultiplier(int N, int M, int K);
         double GetNextMultiplier();
         double GetWinChance();
 
-        // ── UI helpers ────────────────────────────────────────────────────────
         string GetCellClass(MinesCellState s);
         string GetCellMult(int idx);
         string GetChanceColor(double p);
@@ -83,39 +66,33 @@ namespace CasinoApp.BusinessLogic.Services
 
     public class MinesService : IMinesService
     {
-        // ── Config ────────────────────────────────────────────────────────────
-        public static readonly int[] GridSizes  = { 25, 36, 49, 64 };
+        public static readonly int[] GridSizes = { 25, 36, 49, 64 };
         public static readonly int[] ChipDenoms = { 1, 5, 10, 25, 50, 100 };
         private const decimal MaxBet = 1_000_000m;
 
-        // ── State ─────────────────────────────────────────────────────────────
-        public MinesGameState   GameState         { get; private set; } = MinesGameState.Idle;
-        public MinesCellState[] Cells             { get; private set; } = Array.Empty<MinesCellState>();
-        public int              SafeRevealed      { get; private set; }
-        public double           CurrentMultiplier { get; private set; } = 1.0;
-        public decimal          CurrentBet        { get; private set; }
-        public decimal          LastBet           { get; private set; }
-        public decimal          CashOutWin        { get; private set; }
-        public int              GridSize          { get; private set; } = 25;
-        public int              MineCount         { get; private set; } = 3;
-        public int              Cols              => (int)Math.Sqrt(GridSize);
-        public int              MaxMines          => GridSize - 2;
+        public MinesGameState GameState { get; private set; } = MinesGameState.Idle;
+        public MinesCellState[] Cells { get; private set; } = Array.Empty<MinesCellState>();
+        public int SafeRevealed { get; private set; }
+        public double CurrentMultiplier { get; private set; } = 1.0;
+        public decimal CurrentBet { get; private set; }
+        public decimal LastBet { get; private set; }
+        public decimal CashOutWin { get; private set; }
+        public int GridSize { get; private set; } = 25;
+        public int MineCount { get; private set; } = 3;
+        public int Cols => (int)Math.Sqrt(GridSize);
+        public int MaxMines => GridSize - 2;
 
-        private HashSet<int>            _mineSet         = new();
+        private HashSet<int> _mineSet = new();
         private Dictionary<int, double> _cellMultipliers = new();
-
-        // ── Config setters ────────────────────────────────────────────────────
 
         public void SetGridSize(int gs)
         {
-            GridSize  = gs;
+            GridSize = gs;
             MineCount = Math.Min(MineCount, MaxMines);
         }
 
         public void SetMineCount(int mc) =>
             MineCount = Math.Clamp(mc, 1, MaxMines);
-
-        // ── Betting ───────────────────────────────────────────────────────────
 
         public void AddChip(int denomination, double playerBalance, out string? error)
         {
@@ -129,9 +106,9 @@ namespace CasinoApp.BusinessLogic.Services
             CurrentBet = newBet;
         }
 
-        public void ClearBet()  { CurrentBet = 0; }
+        public void ClearBet() { CurrentBet = 0; }
 
-        public void HalfBet()   { CurrentBet = Math.Max(1, Math.Floor(CurrentBet / 2)); }
+        public void HalfBet() { CurrentBet = Math.Max(1, Math.Floor(CurrentBet / 2)); }
 
         public void DoubleBet(double playerBalance, out string? error)
         {
@@ -154,24 +131,21 @@ namespace CasinoApp.BusinessLogic.Services
         public bool CanStart(double playerBalance) =>
             CurrentBet > 0 && playerBalance >= (double)CurrentBet;
 
-        // ── Round flow ────────────────────────────────────────────────────────
-
         public StartResult StartGame(double playerBalance)
         {
             double balAfterBet = playerBalance - (double)CurrentBet;
 
-            // Place mines randomly
-            var rng   = new Random();
-            _mineSet  = new HashSet<int>();
+            var rng = new Random();
+            _mineSet = new HashSet<int>();
             while (_mineSet.Count < MineCount)
                 _mineSet.Add(rng.Next(GridSize));
 
-            Cells             = new MinesCellState[GridSize]; // all Hidden by default
-            _cellMultipliers  = new();
-            SafeRevealed      = 0;
+            Cells = new MinesCellState[GridSize];
+            _cellMultipliers = new();
+            SafeRevealed = 0;
             CurrentMultiplier = 1.0;
-            CashOutWin        = 0;
-            GameState         = MinesGameState.Playing;
+            CashOutWin = 0;
+            GameState = MinesGameState.Playing;
 
             return new StartResult(balAfterBet, CurrentBet);
         }
@@ -191,30 +165,29 @@ namespace CasinoApp.BusinessLogic.Services
                 GameState = MinesGameState.GameOver;
 
                 return new RevealResult(
-                    HitMine:    true,
+                    HitMine: true,
                     AutoCashOut: false,
-                    NewBalance: currentBalance,   // balance unchanged — bet was already deducted
+                    NewBalance: currentBalance,
                     CashOutWin: 0,
-                    BetStatus:  "Lost"
+                    BetStatus: "Lost"
                 );
             }
             else
             {
                 SafeRevealed++;
-                CurrentMultiplier        = GetMultiplier(GridSize, MineCount, SafeRevealed);
-                _cellMultipliers[idx]    = CurrentMultiplier;
-                Cells[idx]               = MinesCellState.Safe;
+                CurrentMultiplier = GetMultiplier(GridSize, MineCount, SafeRevealed);
+                _cellMultipliers[idx] = CurrentMultiplier;
+                Cells[idx] = MinesCellState.Safe;
 
-                // Auto cash-out when all safe cells are revealed
                 if (SafeRevealed == GridSize - MineCount)
                 {
                     var co = CashOut(currentBalance);
                     return new RevealResult(
-                        HitMine:     false,
+                        HitMine: false,
                         AutoCashOut: true,
-                        NewBalance:  co.NewBalance,
-                        CashOutWin:  co.CashOutWin,
-                        BetStatus:   "Won"
+                        NewBalance: co.NewBalance,
+                        CashOutWin: co.CashOutWin,
+                        BetStatus: "Won"
                     );
                 }
 
@@ -227,10 +200,10 @@ namespace CasinoApp.BusinessLogic.Services
             if (GameState != MinesGameState.Playing || SafeRevealed == 0)
                 return new CashOutResult(0, currentBalance);
 
-            CashOutWin    = Math.Round(CurrentBet * (decimal)CurrentMultiplier, 2);
+            CashOutWin = Math.Round(CurrentBet * (decimal)CurrentMultiplier, 2);
             double newBal = currentBalance + (double)CashOutWin;
 
-            LastBet    = CurrentBet;
+            LastBet = CurrentBet;
             CurrentBet = 0;
 
             RevealAllMines();
@@ -242,18 +215,15 @@ namespace CasinoApp.BusinessLogic.Services
 
         public void NewRound()
         {
-            Cells             = Array.Empty<MinesCellState>();
-            _mineSet          = new();
-            _cellMultipliers  = new();
-            SafeRevealed      = 0;
+            Cells = Array.Empty<MinesCellState>();
+            _mineSet = new();
+            _cellMultipliers = new();
+            SafeRevealed = 0;
             CurrentMultiplier = 1.0;
-            CashOutWin        = 0;
-            GameState         = MinesGameState.Idle;
+            CashOutWin = 0;
+            GameState = MinesGameState.Idle;
         }
 
-        // ── Multiplier math ───────────────────────────────────────────────────
-        // Formula: 0.99 × C(N,K) / C(N-M,K)
-        // Computed via log-sum to avoid overflow on large grids
         public double GetMultiplier(int N, int M, int K)
         {
             if (K <= 0) return 1.0;
@@ -274,23 +244,21 @@ namespace CasinoApp.BusinessLogic.Services
             return 100.0 * safesLeft / remaining;
         }
 
-        // ── UI helpers ────────────────────────────────────────────────────────
-
         public string CellSizePx => GridSize switch
         {
             25 => "90px",
             36 => "76px",
             49 => "64px",
-            _  => "54px"
+            _ => "54px"
         };
 
         public string GetCellClass(MinesCellState s) => s switch
         {
-            MinesCellState.Safe           => "cell-safe",
-            MinesCellState.Mine           => "cell-mine",
-            MinesCellState.MineBoom       => "cell-boom",
+            MinesCellState.Safe => "cell-safe",
+            MinesCellState.Mine => "cell-mine",
+            MinesCellState.MineBoom => "cell-boom",
             MinesCellState.SafeUnrevealed => "cell-safe-ghost",
-            _                             => "cell-hidden"
+            _ => "cell-hidden"
         };
 
         public string GetCellMult(int idx) =>
@@ -301,10 +269,8 @@ namespace CasinoApp.BusinessLogic.Services
             >= 70 => "#2ecc71",
             >= 45 => "#f39c12",
             >= 20 => "#e67e22",
-            _     => "#e74c3c"
+            _ => "#e74c3c"
         };
-
-        // ── Private helpers ───────────────────────────────────────────────────
 
         private void RevealAllMines()
         {

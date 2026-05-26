@@ -13,7 +13,6 @@
 
 <div class="sl-wrapper">
 
-    @* ── HEADER BALANTA + PARIU ─────────────────────────────────────────── *@
     <div class="sl-top">
         <div class="sl-balance-box">
             <span class="sl-label">BALANTĂ</span>
@@ -33,20 +32,21 @@
                 {
                     int bv = b;
                     <button class="sl-chip @(betAmount == bv ? "active" : "") @(isSpinning ? "locked" : "")"
-                            @onclick="() => SetBet(bv)">@bv</button>
+                            @onclick="() => SetBet(bv)">
+                        @bv
+                    </button>
                 }
             </div>
         </div>
     </div>
 
-    @* ── MASINA SLOT ─────────────────────────────────────────────────────── *@
     <div class="sl-machine">
 
         <div class="sl-paylines-left">
             @for (int i = 0; i < 5; i++)
             {
                 int pi = i;
-                <div class="sl-pl-label @(activePaylines.Contains(pi) ? "pl-active" : "")">P@(pi+1)</div>
+                <div class="sl-pl-label @(activePaylines.Contains(pi) ? "pl-active" : "")">P@(pi + 1)</div>
             }
         </div>
 
@@ -67,7 +67,10 @@
                         </div>
                     }
                 </div>
-                @if (r < 4) { <div class="sl-reel-divider"></div> }
+                @if (r < 4)
+                {
+                    <div class="sl-reel-divider"></div>
+                }
             }
         </div>
 
@@ -75,13 +78,12 @@
             @for (int i = 0; i < 5; i++)
             {
                 int pi = i;
-                <div class="sl-pl-label @(activePaylines.Contains(pi) ? "pl-active" : "")">P@(pi+1)</div>
+                <div class="sl-pl-label @(activePaylines.Contains(pi) ? "pl-active" : "")">P@(pi + 1)</div>
             }
         </div>
 
     </div>
 
-    @* ── WIN LINES INFO ─────────────────────────────────────────────────── *@
     @if (winLines.Count > 0 && !isSpinning)
     {
         <div class="sl-win-lines-info">
@@ -101,7 +103,6 @@
         <div class="sl-error">@errorMsg</div>
     }
 
-    @* ── TABLA SIMBOLURI ────────────────────────────────────────────────── *@
     <div class="sl-paytable">
         @foreach (var sym in SL.Symbols)
         {
@@ -121,109 +122,110 @@
             <span class="sl-spin-anim">◉</span>
             <span>SE INVARTE...</span>
         }
-        else { <span>⚡ SPIN</span> }
+        else
+        {
+
+            <span>⚡ SPIN</span>
+        }
     </button>
 
     <div class="sl-paylines-hint">5 LINII DE CÂȘTIG ACTIVE</div>
 
 </div>
 
-@* ── JAVASCRIPT — neschimbat ─────────────────────────────────────────────── *@
 <script>
-window.slotsGame = (function() {
+    window.slotsGame = (function() {
 
-    var dotnet    = null;
-    var symList   = ['🍒','🍋','🍊','🔔','⭐','💎','7️⃣'];
-    var intervals = [null, null, null, null, null];
-    var spaceListenerAdded = false;
+        var dotnet    = null;
+        var symList   = ['🍒','🍋','🍊','🔔','⭐','💎','7️⃣'];
+        var intervals = [null, null, null, null, null];
+        var spaceListenerAdded = false;
 
-    function init(dotnetRef) {
-        dotnet = dotnetRef;
+        function init(dotnetRef) {
+            dotnet = dotnetRef;
 
-        if (!spaceListenerAdded) {
-            window.addEventListener('keydown', function(e) {
-                if (e.code === 'Space' || e.key === ' ') {
-                    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-                        e.preventDefault();
-                        var spinBtn = document.getElementById('spin-btn');
-                        if (spinBtn && !spinBtn.disabled) spinBtn.click();
+            if (!spaceListenerAdded) {
+                window.addEventListener('keydown', function(e) {
+                    if (e.code === 'Space' || e.key === ' ') {
+                        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                            e.preventDefault();
+                            var spinBtn = document.getElementById('spin-btn');
+                            if (spinBtn && !spinBtn.disabled) spinBtn.click();
+                        }
                     }
-                }
-            });
-            spaceListenerAdded = true;
+                });
+                spaceListenerAdded = true;
+            }
         }
-    }
 
-    function spin(dotnetObj, result) {
-        var stopDelays = [1200, 1900, 2600, 3300, 4000];
+        function spin(dotnetObj, result) {
+            var stopDelays = [1200, 1900, 2600, 3300, 4000];
 
-        for (var r = 0; r < 5; r++) {
-            (function(ri) {
-                var col = document.getElementById('reel-col-' + ri);
-                if (col) { col.classList.remove('reel-landed'); col.classList.add('reel-spinning'); }
+            for (var r = 0; r < 5; r++) {
+                (function(ri) {
+                    var col = document.getElementById('reel-col-' + ri);
+                    if (col) { col.classList.remove('reel-landed'); col.classList.add('reel-spinning'); }
 
-                intervals[ri] = setInterval((function(reel) {
-                    return function() {
-                        for (var row = 0; row < 3; row++) {
-                            var cell = document.getElementById('r' + reel + 'c' + row);
-                            if (cell) cell.textContent = symList[Math.floor(Math.random() * symList.length)];
-                        }
-                    };
-                })(ri), 30);
-
-                setTimeout((function(reel, res) {
-                    return function() {
-                        clearInterval(intervals[reel]);
-                        intervals[reel] = null;
-
-                        var col2 = document.getElementById('reel-col-' + reel);
-                        if (col2) { col2.classList.remove('reel-spinning'); col2.classList.add('reel-stopping'); }
-
-                        for (var row = 0; row < 3; row++) {
-                            var cell = document.getElementById('r' + reel + 'c' + row);
-                            if (cell) cell.textContent = res[reel * 3 + row];
-                        }
-
-                        setTimeout(function() {
-                            if (col2) { col2.classList.remove('reel-stopping'); col2.classList.add('reel-landed'); }
-                            if (reel === 4) {
-                                setTimeout(function() {
-                                    if (dotnetObj) dotnetObj.invokeMethodAsync('OnSpinComplete');
-                                }, 200);
+                    intervals[ri] = setInterval((function(reel) {
+                        return function() {
+                            for (var row = 0; row < 3; row++) {
+                                var cell = document.getElementById('r' + reel + 'c' + row);
+                                if (cell) cell.textContent = symList[Math.floor(Math.random() * symList.length)];
                             }
-                        }, 350);
-                    };
-                })(ri, result), stopDelays[ri]);
+                        };
+                    })(ri), 30);
 
-            })(r);
+                    setTimeout((function(reel, res) {
+                        return function() {
+                            clearInterval(intervals[reel]);
+                            intervals[reel] = null;
+
+                            var col2 = document.getElementById('reel-col-' + reel);
+                            if (col2) { col2.classList.remove('reel-spinning'); col2.classList.add('reel-stopping'); }
+
+                            for (var row = 0; row < 3; row++) {
+                                var cell = document.getElementById('r' + reel + 'c' + row);
+                                if (cell) cell.textContent = res[reel * 3 + row];
+                            }
+
+                            setTimeout(function() {
+                                if (col2) { col2.classList.remove('reel-stopping'); col2.classList.add('reel-landed'); }
+                                if (reel === 4) {
+                                    setTimeout(function() {
+                                        if (dotnetObj) dotnetObj.invokeMethodAsync('OnSpinComplete');
+                                    }, 200);
+                                }
+                            }, 350);
+                        };
+                    })(ri, result), stopDelays[ri]);
+
+                })(r);
+            }
         }
-    }
 
-    return { init: init, spin: spin };
-})();
+        return { init: init, spin: spin };
+    })();
 </script>
 
 @code {
 
-    // ── UI-only state ─────────────────────────────────────────────────────
     private readonly int[] betOptions = { 1, 5, 10, 25, 50, 100 };
     private int betAmount = 1;
 
-    private List<WinLine>  winLines       = new();
-    private List<int>      activePaylines = new();
-    private HashSet<int>   winCells       = new();
-    private double         totalWin       = 0;
-    private bool           isSpinning     = false;
-    private bool[]         reelStopped    = new bool[5];
-    private string         errorMsg       = "";
-    private Guid           spinKey        = Guid.NewGuid();
+    private List<WinLine> winLines = new();
+    private List<int> activePaylines = new();
+    private HashSet<int> winCells = new();
+    private double totalWin = 0;
+    private bool isSpinning = false;
+    private bool[] reelStopped = new bool[5];
+    private string errorMsg = "";
+    private Guid spinKey = Guid.NewGuid();
 
-    private int  slotsGameId = 0;
+    private int slotsGameId = 0;
     private int? currentBetId = null;
 
     private DotNetObjectReference<Slots>? dotnetRef;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         dotnetRef = DotNetObjectReference.Create(this);
@@ -243,7 +245,6 @@ window.slotsGame = (function() {
 
     private void SetBet(int b) { if (!isSpinning) betAmount = b; }
 
-    // ── SPIN ──────────────────────────────────────────────────────────────
     private async Task Spin()
     {
         if (isSpinning) return;
@@ -251,32 +252,31 @@ window.slotsGame = (function() {
         var setup = SL.GenerateSpin(betAmount, Session.CurrentPlayer!.Balance, out string? err);
         if (err != null) { errorMsg = err; return; }
 
-        errorMsg       = "";
-        isSpinning     = true;
-        winLines       = new();
+        errorMsg = "";
+        isSpinning = true;
+        winLines = new();
         activePaylines = new();
-        winCells       = new();
-        totalWin       = 0;
-        reelStopped    = new bool[5];
-        spinKey        = Guid.NewGuid();
+        winCells = new();
+        totalWin = 0;
+        reelStopped = new bool[5];
+        spinKey = Guid.NewGuid();
 
         Session.UpdateBalance(setup.BalanceAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, setup.BalanceAfterBet);
 
         currentBetId = BetRepo.Create(new Bet
         {
-            PlayerId  = Session.CurrentPlayer.Id,
-            GameId    = slotsGameId,
+            PlayerId = Session.CurrentPlayer.Id,
+            GameId = slotsGameId,
             SessionId = null,
-            Amount    = setup.BetAmount,
-            Status    = "Pending"
+            Amount = setup.BetAmount,
+            Status = "Pending"
         });
 
         await InvokeAsync(StateHasChanged);
         await JS.InvokeVoidAsync("slotsGame.spin", dotnetRef, setup.FlatGrid);
     }
 
-    // ── JS CALLBACK ───────────────────────────────────────────────────────
     [JSInvokable]
     public async Task OnSpinComplete()
     {
@@ -284,10 +284,10 @@ window.slotsGame = (function() {
 
         var result = SL.CalculateWins(betAmount);
 
-        winLines       = result.WinLines;
+        winLines = result.WinLines;
         activePaylines = result.ActivePaylines;
-        winCells       = result.WinCells;
-        totalWin       = result.TotalWin;
+        winCells = result.WinCells;
+        totalWin = result.TotalWin;
 
         if (totalWin > 0)
         {
@@ -308,70 +308,441 @@ window.slotsGame = (function() {
 }
 
 <style>
-    .sl-wrapper { font-family:'Rajdhani',sans-serif; color:#f0e6d3; display:flex; flex-direction:column; align-items:center; gap:20px; padding:28px 24px 36px; background:radial-gradient(ellipse at 50% 0%,rgba(196,30,58,0.07) 0%,transparent 65%); }
-    .sl-top { display:flex; align-items:center; justify-content:center; gap:32px; flex-wrap:wrap; width:100%; max-width:700px; }
-    .sl-label       { display:block; font-size:0.65rem; letter-spacing:3px; color:#555; margin-bottom:4px; font-weight:700; }
-    .sl-balance-box { text-align:center; }
-    .sl-balance-val { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; color:#D4AF37; letter-spacing:2px; }
-    .sl-win-box     { text-align:center; }
-    .sl-win-val     { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; color:#4CAF50; letter-spacing:2px; animation:winPop 0.4s ease; }
-    @@keyframes winPop { 0%{transform:scale(0.7);opacity:0;} 60%{transform:scale(1.15);} 100%{transform:scale(1);opacity:1;} }
-    .sl-bet-box     { text-align:center; }
-    .sl-chips       { display:flex; gap:8px; justify-content:center; }
-    .sl-chip { width:42px; height:42px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); background:#1a1a1a; color:#888; font-family:'Bebas Neue',sans-serif; font-size:0.85rem; cursor:pointer; transition:all 0.2s; }
-    .sl-chip:hover:not(.locked) { border-color:rgba(212,175,55,0.5); color:#D4AF37; transform:scale(1.08); }
-    .sl-chip.active  { background:linear-gradient(135deg,#8B0000,#C41E3A); border-color:#C41E3A; color:white; box-shadow:0 0 14px rgba(196,30,58,0.5); transform:scale(1.1); }
-    .sl-chip.locked  { opacity:0.5; cursor:not-allowed; }
+    .sl-wrapper {
+        font-family: 'Rajdhani',sans-serif;
+        color: #f0e6d3;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        padding: 28px 24px 36px;
+        background: radial-gradient(ellipse at 50% 0%,rgba(196,30,58,0.07) 0%,transparent 65%);
+    }
 
-    .sl-machine { display:flex; align-items:center; gap:12px; }
-    .sl-reels-frame { position:relative; display:flex; align-items:center; background:#0d0d0d; border:2px solid rgba(212,175,55,0.25); border-radius:12px; padding:8px; box-shadow:0 0 0 1px rgba(0,0,0,0.8),0 0 40px rgba(0,0,0,0.6),inset 0 0 30px rgba(0,0,0,0.5); overflow:hidden; }
-    .sl-main-line-overlay { display:none; }
-    .sl-reel-col { display:flex; flex-direction:column; width:80px; transition:transform 0.1s; position:relative; z-index:2; }
-    .sl-reel-divider { width:1px; height:270px; background:linear-gradient(to bottom,transparent,rgba(212,175,55,0.2) 30%,rgba(212,175,55,0.2) 70%,transparent); flex-shrink:0; z-index:2; }
-    .sl-cell { width:80px; height:90px; display:flex; align-items:center; justify-content:center; font-size:2rem; border-radius:8px; transition:background 0.3s; user-select:none; }
-    .sl-cell-main { font-size:2rem; }
-    .sl-cell-win { background:rgba(212,175,55,0.12) !important; border:1px solid rgba(212,175,55,0.4); box-shadow:inset 0 0 20px rgba(212,175,55,0.15),0 0 16px rgba(212,175,55,0.2); animation:cellWinGlow 1s ease-in-out infinite alternate; }
-    @@keyframes cellWinGlow { from{box-shadow:inset 0 0 10px rgba(212,175,55,0.1),0 0 8px rgba(212,175,55,0.15);} to{box-shadow:inset 0 0 24px rgba(212,175,55,0.25),0 0 20px rgba(212,175,55,0.35);} }
+    .sl-top {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 32px;
+        flex-wrap: wrap;
+        width: 100%;
+        max-width: 700px;
+    }
 
-    .reel-spinning .sl-cell { filter:blur(2px); animation:symbolBlur 0.07s steps(1) infinite; }
-    @@keyframes symbolBlur { 0%{transform:translateY(-4px);} 50%{transform:translateY(4px);} 100%{transform:translateY(0);} }
-    .reel-stopping .sl-cell { animation:reelStop 0.35s cubic-bezier(0.2,0.9,0.3,1.1); }
-    @@keyframes reelStop { 0%{transform:translateY(-20px);filter:blur(2px);} 60%{transform:translateY(5px);filter:blur(0);} 80%{transform:translateY(-3px);} 100%{transform:translateY(0);} }
-    .reel-landed .sl-cell-win { animation:cellWinGlow 1s ease-in-out infinite alternate,cellPop 0.4s ease; }
-    @@keyframes cellPop { 0%{transform:scale(0.88);} 60%{transform:scale(1.1);} 100%{transform:scale(1);} }
+    .sl-label {
+        display: block;
+        font-size: 0.65rem;
+        letter-spacing: 3px;
+        color: #555;
+        margin-bottom: 4px;
+        font-weight: 700;
+    }
 
-    .sl-paylines-left, .sl-paylines-right { display:flex; flex-direction:column; gap:0; justify-content:space-around; height:270px; padding:8px 0; }
-    .sl-pl-label { font-size:0.65rem; letter-spacing:1px; color:#333; font-weight:700; transition:all 0.3s; padding:0 8px; }
-    .sl-pl-label.pl-active { color:#D4AF37; text-shadow:0 0 10px rgba(212,175,55,0.6); }
+    .sl-balance-box {
+        text-align: center;
+    }
 
-    .sl-win-lines-info { display:flex; flex-direction:column; gap:6px; width:100%; max-width:560px; animation:fadeUp 0.3s ease; }
-    @@keyframes fadeUp { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
-    .sl-win-line-item { display:flex; justify-content:space-between; align-items:center; background:rgba(212,175,55,0.07); border:1px solid rgba(212,175,55,0.2); border-radius:6px; padding:8px 16px; font-size:0.88rem; }
-    .wl-p   { color:#555; font-size:0.75rem; letter-spacing:1px; }
-    .wl-sym { color:#f0e6d3; font-size:1rem; }
-    .wl-amt { color:#D4AF37; font-weight:700; font-size:1rem; }
+    .sl-balance-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.8rem;
+        color: #D4AF37;
+        letter-spacing: 2px;
+    }
 
-    .sl-error { color:#ff6b6b; background:rgba(139,0,0,0.2); border:1px solid rgba(196,30,58,0.4); border-radius:6px; padding:8px 20px; font-size:0.82rem; }
+    .sl-win-box {
+        text-align: center;
+    }
 
-    .sl-paytable { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-    .sl-pay-row  { display:flex; flex-direction:column; align-items:center; gap:2px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px 14px; min-width:72px; }
-    .sl-pay-sym  { font-size:1.6rem; margin-bottom:4px; }
-    .sl-pay-mult { font-family:'Bebas Neue',sans-serif; font-size:0.75rem; color:#D4AF37; letter-spacing:1px; }
+    .sl-win-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.8rem;
+        color: #4CAF50;
+        letter-spacing: 2px;
+        animation: winPop 0.4s ease;
+    }
 
-    .sl-spin-btn { padding:16px 70px; background:linear-gradient(135deg,#8B0000 0%,#C41E3A 100%); color:#f0e6d3; border:none; border-radius:8px; font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:5px; cursor:pointer; transition:all 0.2s; box-shadow:0 6px 28px rgba(196,30,58,0.45),0 2px 0 #5a0000; display:flex; align-items:center; gap:12px; }
-    .sl-spin-btn:hover:not(:disabled) { background:linear-gradient(135deg,#C41E3A 0%,#e8203d 100%); transform:translateY(-3px); box-shadow:0 12px 36px rgba(196,30,58,0.6),0 2px 0 #5a0000; }
-    .sl-spin-btn:active:not(:disabled) { transform:translateY(0); box-shadow:0 4px 16px rgba(196,30,58,0.4); }
-    .sl-spin-btn:disabled { cursor:not-allowed; opacity:0.75; background:#333; box-shadow:none; transform:none; }
-    .sl-spin-anim { animation:spinRot 0.6s linear infinite; display:inline-block; }
-    @@keyframes spinRot { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+    @@keyframes winPop {
+        0% {
+            transform: scale(0.7);
+            opacity: 0;
+        }
 
-    .sl-paylines-hint { font-size:0.68rem; letter-spacing:2px; color:#333; font-weight:700; }
+        60% {
+            transform: scale(1.15);
+        }
+
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .sl-bet-box {
+        text-align: center;
+    }
+
+    .sl-chips {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+    }
+
+    .sl-chip {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.1);
+        background: #1a1a1a;
+        color: #888;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .sl-chip:hover:not(.locked) {
+            border-color: rgba(212,175,55,0.5);
+            color: #D4AF37;
+            transform: scale(1.08);
+        }
+
+        .sl-chip.active {
+            background: linear-gradient(135deg,#8B0000,#C41E3A);
+            border-color: #C41E3A;
+            color: white;
+            box-shadow: 0 0 14px rgba(196,30,58,0.5);
+            transform: scale(1.1);
+        }
+
+        .sl-chip.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+    .sl-machine {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .sl-reels-frame {
+        position: relative;
+        display: flex;
+        align-items: center;
+        background: #0d0d0d;
+        border: 2px solid rgba(212,175,55,0.25);
+        border-radius: 12px;
+        padding: 8px;
+        box-shadow: 0 0 0 1px rgba(0,0,0,0.8),0 0 40px rgba(0,0,0,0.6),inset 0 0 30px rgba(0,0,0,0.5);
+        overflow: hidden;
+    }
+
+    .sl-main-line-overlay {
+        display: none;
+    }
+
+    .sl-reel-col {
+        display: flex;
+        flex-direction: column;
+        width: 80px;
+        transition: transform 0.1s;
+        position: relative;
+        z-index: 2;
+    }
+
+    .sl-reel-divider {
+        width: 1px;
+        height: 270px;
+        background: linear-gradient(to bottom,transparent,rgba(212,175,55,0.2) 30%,rgba(212,175,55,0.2) 70%,transparent);
+        flex-shrink: 0;
+        z-index: 2;
+    }
+
+    .sl-cell {
+        width: 80px;
+        height: 90px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        border-radius: 8px;
+        transition: background 0.3s;
+        user-select: none;
+    }
+
+    .sl-cell-main {
+        font-size: 2rem;
+    }
+
+    .sl-cell-win {
+        background: rgba(212,175,55,0.12) !important;
+        border: 1px solid rgba(212,175,55,0.4);
+        box-shadow: inset 0 0 20px rgba(212,175,55,0.15),0 0 16px rgba(212,175,55,0.2);
+        animation: cellWinGlow 1s ease-in-out infinite alternate;
+    }
+
+    @@keyframes cellWinGlow {
+        from {
+            box-shadow: inset 0 0 10px rgba(212,175,55,0.1),0 0 8px rgba(212,175,55,0.15);
+        }
+
+        to {
+            box-shadow: inset 0 0 24px rgba(212,175,55,0.25),0 0 20px rgba(212,175,55,0.35);
+        }
+    }
+
+    .reel-spinning .sl-cell {
+        filter: blur(2px);
+        animation: symbolBlur 0.07s steps(1) infinite;
+    }
+
+    @@keyframes symbolBlur {
+        0% {
+            transform: translateY(-4px);
+        }
+
+        50% {
+            transform: translateY(4px);
+        }
+
+        100% {
+            transform: translateY(0);
+        }
+    }
+
+    .reel-stopping .sl-cell {
+        animation: reelStop 0.35s cubic-bezier(0.2,0.9,0.3,1.1);
+    }
+
+    @@keyframes reelStop {
+        0% {
+            transform: translateY(-20px);
+            filter: blur(2px);
+        }
+
+        60% {
+            transform: translateY(5px);
+            filter: blur(0);
+        }
+
+        80% {
+            transform: translateY(-3px);
+        }
+
+        100% {
+            transform: translateY(0);
+        }
+    }
+
+    .reel-landed .sl-cell-win {
+        animation: cellWinGlow 1s ease-in-out infinite alternate,cellPop 0.4s ease;
+    }
+
+    @@keyframes cellPop {
+        0% {
+            transform: scale(0.88);
+        }
+
+        60% {
+            transform: scale(1.1);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    .sl-paylines-left, .sl-paylines-right {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        justify-content: space-around;
+        height: 270px;
+        padding: 8px 0;
+    }
+
+    .sl-pl-label {
+        font-size: 0.65rem;
+        letter-spacing: 1px;
+        color: #333;
+        font-weight: 700;
+        transition: all 0.3s;
+        padding: 0 8px;
+    }
+
+        .sl-pl-label.pl-active {
+            color: #D4AF37;
+            text-shadow: 0 0 10px rgba(212,175,55,0.6);
+        }
+
+    .sl-win-lines-info {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+        max-width: 560px;
+        animation: fadeUp 0.3s ease;
+    }
+
+    @@keyframes fadeUp {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .sl-win-line-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(212,175,55,0.07);
+        border: 1px solid rgba(212,175,55,0.2);
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 0.88rem;
+    }
+
+    .wl-p {
+        color: #555;
+        font-size: 0.75rem;
+        letter-spacing: 1px;
+    }
+
+    .wl-sym {
+        color: #f0e6d3;
+        font-size: 1rem;
+    }
+
+    .wl-amt {
+        color: #D4AF37;
+        font-weight: 700;
+        font-size: 1rem;
+    }
+
+    .sl-error {
+        color: #ff6b6b;
+        background: rgba(139,0,0,0.2);
+        border: 1px solid rgba(196,30,58,0.4);
+        border-radius: 6px;
+        padding: 8px 20px;
+        font-size: 0.82rem;
+    }
+
+    .sl-paytable {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .sl-pay-row {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 8px;
+        padding: 10px 14px;
+        min-width: 72px;
+    }
+
+    .sl-pay-sym {
+        font-size: 1.6rem;
+        margin-bottom: 4px;
+    }
+
+    .sl-pay-mult {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.75rem;
+        color: #D4AF37;
+        letter-spacing: 1px;
+    }
+
+    .sl-spin-btn {
+        padding: 16px 70px;
+        background: linear-gradient(135deg,#8B0000 0%,#C41E3A 100%);
+        color: #f0e6d3;
+        border: none;
+        border-radius: 8px;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.5rem;
+        letter-spacing: 5px;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 6px 28px rgba(196,30,58,0.45),0 2px 0 #5a0000;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+        .sl-spin-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg,#C41E3A 0%,#e8203d 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 36px rgba(196,30,58,0.6),0 2px 0 #5a0000;
+        }
+
+        .sl-spin-btn:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 4px 16px rgba(196,30,58,0.4);
+        }
+
+        .sl-spin-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.75;
+            background: #333;
+            box-shadow: none;
+            transform: none;
+        }
+
+    .sl-spin-anim {
+        animation: spinRot 0.6s linear infinite;
+        display: inline-block;
+    }
+
+    @@keyframes spinRot {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .sl-paylines-hint {
+        font-size: 0.68rem;
+        letter-spacing: 2px;
+        color: #333;
+        font-weight: 700;
+    }
 
     @@media (max-width:700px) {
-        .sl-cell { width:58px; height:72px; font-size:1.5rem; }
-        .sl-cell-main { font-size:1.5rem; }
-        .sl-reel-col { width:58px; }
-        .sl-reel-divider { height:216px; }
-        .sl-paylines-left,.sl-paylines-right { height:216px; }
+        .sl-cell {
+            width: 58px;
+            height: 72px;
+            font-size: 1.5rem;
+        }
+
+        .sl-cell-main {
+            font-size: 1.5rem;
+        }
+
+        .sl-reel-col {
+            width: 58px;
+        }
+
+        .sl-reel-divider {
+            height: 216px;
+        }
+
+        .sl-paylines-left, .sl-paylines-right {
+            height: 216px;
+        }
     }
 </style>

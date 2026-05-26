@@ -1,11 +1,3 @@
-// CasinoApp.BusinessLogic/Services/BarbutService.cs
-//
-// All Barbut game logic extracted from Barbut.razor.
-// Zero Blazor/UI dependencies — returns plain data objects.
-//
-// Register in Program.cs:
-//   builder.Services.AddScoped<IBarbutService, BarbutService>();
-
 using System;
 using System.Linq;
 
@@ -13,28 +5,22 @@ namespace CasinoApp.BusinessLogic.Services
 {
     public interface IBarbutService
     {
-        // State
-        int[]   PlayerDice { get; }
-        int[][] AIDice     { get; }
-        int     PlayerSum  { get; }
-        int[]   AISums     { get; }
-        int     BeatCount  { get; }
-        double  NetGain    { get; }
+        int[] PlayerDice { get; }
+        int[][] AIDice { get; }
+        int PlayerSum { get; }
+        int[] AISums { get; }
+        int BeatCount { get; }
+        double NetGain { get; }
 
-        // AI cosmetics (names/avatars are UI-only but generated here for testability)
-        string[] AINames   { get; }
+        string[] AINames { get; }
         string[] AIAvatars { get; }
 
-        // Called once on component init
         void PickRandomAINames();
 
-        // Called when the player clicks Roll — returns balance after bet deduction
         RollSetup PrepareRoll(int betAmount, int diceCount, double playerBalance);
 
-        // Called by JS callback OnRollComplete — returns new balance if player won
         RollResult ResolveRoll(int betAmount, double balanceAfterBet);
 
-        // UI helpers (CSS class strings — kept here so Razor stays logic-free)
         string GetPlayerCardClass();
         string GetPlayerSumClass();
         string GetAICardClass(int idx);
@@ -44,27 +30,24 @@ namespace CasinoApp.BusinessLogic.Services
         string BuildDieDots(int value);
     }
 
-    // PrepareRoll return: everything the Razor needs before calling JS
     public record RollSetup(
-        int[]   PlayerDice,
+        int[] PlayerDice,
         int[][] AIDice,
-        int     PlayerSum,
-        int[]   AISums,
-        int     BeatCount,
-        double  NetGain,
-        double  BalanceAfterBet
+        int PlayerSum,
+        int[] AISums,
+        int BeatCount,
+        double NetGain,
+        double BalanceAfterBet
     );
 
-    // ResolveRoll return: final balance (only changes if player won)
     public record RollResult(
-        double  NewBalance,
-        bool    BalanceChanged,   // false if player lost — no DB write needed
-        string  BetStatus         // "Won" | "Push" | "Lost"
+        double NewBalance,
+        bool BalanceChanged,
+        string BetStatus
     );
 
     public class BarbutService : IBarbutService
     {
-        // ── Name/avatar pools ─────────────────────────────────────────────────
         private static readonly string[] NamePool =
         {
             "Andrei", "Mihai", "Ion", "Alexandru", "Bogdan",
@@ -81,29 +64,26 @@ namespace CasinoApp.BusinessLogic.Services
             "🤡", "😤", "🫡", "🥷", "🤯", "😏", "💀"
         };
 
-        // ── State ─────────────────────────────────────────────────────────────
-        public int[]   PlayerDice { get; private set; } = Array.Empty<int>();
-        public int[][] AIDice     { get; private set; } = { Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>() };
-        public int     PlayerSum  { get; private set; }
-        public int[]   AISums     { get; private set; } = new int[3];
-        public int     BeatCount  { get; private set; }
-        public double  NetGain    { get; private set; }
+        public int[] PlayerDice { get; private set; } = Array.Empty<int>();
+        public int[][] AIDice { get; private set; } = { Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>() };
+        public int PlayerSum { get; private set; }
+        public int[] AISums { get; private set; } = new int[3];
+        public int BeatCount { get; private set; }
+        public double NetGain { get; private set; }
 
-        public string[] AINames   { get; private set; } = new string[3];
+        public string[] AINames { get; private set; } = new string[3];
         public string[] AIAvatars { get; private set; } = new string[3];
 
-        // ── Init ──────────────────────────────────────────────────────────────
         public void PickRandomAINames()
         {
-            var rng   = new Random();
-            AINames   = NamePool.OrderBy(_ => rng.Next()).Take(3).ToArray();
+            var rng = new Random();
+            AINames = NamePool.OrderBy(_ => rng.Next()).Take(3).ToArray();
             AIAvatars = AvatarPool.OrderBy(_ => rng.Next()).Take(3).ToArray();
         }
 
-        // ── Roll logic ────────────────────────────────────────────────────────
         public RollSetup PrepareRoll(int betAmount, int diceCount, double playerBalance)
         {
-            var rng  = new Random();
+            var rng = new Random();
 
             PlayerDice = Enumerable.Range(0, diceCount).Select(_ => rng.Next(1, 7)).ToArray();
             for (int i = 0; i < 3; i++)
@@ -132,15 +112,14 @@ namespace CasinoApp.BusinessLogic.Services
         public RollResult ResolveRoll(int betAmount, double balanceAfterBet)
         {
             double returns = NetGain + betAmount;
-            bool   won     = returns > 0;
+            bool won = returns > 0;
 
-            double newBalance     = won ? balanceAfterBet + returns : balanceAfterBet;
-            string betStatus      = NetGain > 0 ? "Won" : NetGain == 0 ? "Push" : "Lost";
+            double newBalance = won ? balanceAfterBet + returns : balanceAfterBet;
+            string betStatus = NetGain > 0 ? "Won" : NetGain == 0 ? "Push" : "Lost";
 
             return new RollResult(newBalance, won || NetGain == 0, betStatus);
         }
 
-        // ── UI helpers ────────────────────────────────────────────────────────
         public string GetPlayerCardClass() => BeatCount switch
         {
             3 => "card-winner",

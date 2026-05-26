@@ -12,7 +12,6 @@
 
 <div class="mn-table">
 
-    @* ══ SIDEBAR STANGA ══════════════════════════════════════════════════════ *@
     <div class="mn-sidebar">
 
         <div class="mn-bal-box">
@@ -20,10 +19,8 @@
             <span class="mn-bal-val">@Session.CurrentPlayer!.Balance.ToString("F2") RON</span>
         </div>
 
-        @* ── Configurare — doar inainte de start ─────────────────────────── *@
         @if (MN.GameState == MinesGameState.Idle)
         {
-            @* Grid size *@
             <div class="mn-section">
                 <span class="mn-lbl">DIMENSIUNE GRILA</span>
                 <div class="mn-grid-btns">
@@ -38,7 +35,6 @@
                 </div>
             </div>
 
-            @* Mine count slider *@
             <div class="mn-section">
                 <span class="mn-lbl">NUMAR MINE — <span class="mn-lbl-val">@MN.MineCount</span></span>
                 <div class="mn-slider-row">
@@ -55,7 +51,6 @@
                 </div>
             </div>
 
-            @* Bet chips *@
             <div class="mn-section">
                 <span class="mn-lbl">MIZA</span>
                 <div class="mn-bet-display">
@@ -63,8 +58,10 @@
                     {
                         <span class="mn-bet-val">@MN.CurrentBet RON</span>
                         <button class="mn-bet-half" @onclick="HalfBet" title="½">½</button>
-                        <button class="mn-bet-dbl"  @onclick="DoubleBet" title="2×"
-                                disabled="@(Session.CurrentPlayer!.Balance < (double)MN.CurrentBet)">2×</button>
+                        <button class="mn-bet-dbl" @onclick="DoubleBet" title="2×"
+                                disabled="@(Session.CurrentPlayer!.Balance < (double)MN.CurrentBet)">
+                            2×
+                        </button>
                     }
                     else
                     {
@@ -90,7 +87,6 @@
             </div>
         }
 
-        @* ── Info in-game ─────────────────────────────────────────────────── *@
         @if (MN.GameState == MinesGameState.Playing)
         {
             <div class="mn-section">
@@ -107,7 +103,6 @@
             </div>
         }
 
-        @* ── Multiplier + potential win ───────────────────────────────────── *@
         @if (MN.GameState == MinesGameState.Playing)
         {
             <div class="mn-mult-box @(MN.SafeRevealed > 0 ? "mult-active" : "")">
@@ -124,13 +119,11 @@
             </div>
         }
 
-        @* ── Eroare ───────────────────────────────────────────────────────── *@
         @if (!string.IsNullOrEmpty(errorMsg))
         {
             <div class="mn-error">@errorMsg</div>
         }
 
-        @* ── Butoane principale ───────────────────────────────────────────── *@
         <div class="mn-actions">
             @if (MN.GameState == MinesGameState.Idle)
             {
@@ -161,7 +154,6 @@
             }
         </div>
 
-        @* ── Banner rezultat ──────────────────────────────────────────────── *@
         @if (MN.GameState == MinesGameState.GameOver)
         {
             <div class="mn-result-banner res-lose">
@@ -181,7 +173,6 @@
 
     </div>
 
-    @* ══ ZONA JOCULUI ════════════════════════════════════════════════════════ *@
     <div class="mn-game-area">
 
         <div class="mn-game-header">
@@ -240,7 +231,7 @@
                 <span class="mn-lbl" style="font-size:0.58rem">SANSA URMATOAREI CELULE SIGURE</span>
                 <div class="mn-chance-bar-wrap">
                     <div class="mn-chance-bar" style="width: @(winChance.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;
-                                                        background: @MN.GetChanceColor(winChance);"></div>
+                    background: @MN.GetChanceColor(winChance);"></div>
                 </div>
                 <span class="mn-chance-val" style="color: @MN.GetChanceColor(winChance);">@winChance.ToString("F1")%</span>
             </div>
@@ -252,15 +243,13 @@
 
 @code {
 
-    // ── UI-only state ─────────────────────────────────────────────────────
-    private int    roundKey    = 0;
-    private bool   isResetting = false;
-    private string errorMsg    = "";
+    private int roundKey = 0;
+    private bool isResetting = false;
+    private string errorMsg = "";
 
-    private int  minesGameId = 0;
+    private int minesGameId = 0;
     private int? currentBetId = null;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────
     protected override void OnInitialized()
     {
         Session.OnChange += OnSessionChanged;
@@ -269,16 +258,15 @@
     }
 
     private void OnSessionChanged() => InvokeAsync(StateHasChanged);
-    public void Dispose()           => Session.OnChange -= OnSessionChanged;
+    public void Dispose() => Session.OnChange -= OnSessionChanged;
 
-    // ── Betting ───────────────────────────────────────────────────────────
     private void AddChip(int v)
     {
         MN.AddChip(v, Session.CurrentPlayer!.Balance, out string? err);
         errorMsg = err ?? "";
     }
 
-    private void HalfBet()   { MN.HalfBet();   errorMsg = ""; }
+    private void HalfBet() { MN.HalfBet(); errorMsg = ""; }
 
     private void DoubleBet()
     {
@@ -292,7 +280,6 @@
         errorMsg = "";
     }
 
-    // ── START ─────────────────────────────────────────────────────────────
     private void StartGame()
     {
         if (!MN.CanStart(Session.CurrentPlayer!.Balance)) return;
@@ -301,11 +288,11 @@
 
         currentBetId = BetRepo.Create(new Bet
         {
-            PlayerId  = Session.CurrentPlayer.Id,
-            GameId    = minesGameId,
+            PlayerId = Session.CurrentPlayer.Id,
+            GameId = minesGameId,
             SessionId = null,
-            Amount    = (double)result.BetAmount,
-            Status    = "Pending"
+            Amount = (double)result.BetAmount,
+            Status = "Pending"
         });
         Session.UpdateBalance(result.BalanceAfterBet);
         PlayerRepo.UpdateBalance(Session.CurrentPlayer.Id, result.BalanceAfterBet);
@@ -314,7 +301,6 @@
         roundKey++;
     }
 
-    // ── REVEAL ────────────────────────────────────────────────────────────
     private void RevealCell(int idx)
     {
         var result = MN.RevealCell(idx, Session.CurrentPlayer!.Balance);
@@ -339,7 +325,6 @@
         }
     }
 
-    // ── CASH OUT ──────────────────────────────────────────────────────────
     private void CashOut()
     {
         var result = MN.CashOut(Session.CurrentPlayer!.Balance);
@@ -354,263 +339,749 @@
         }
     }
 
-    // ── ROUND NOU ─────────────────────────────────────────────────────────
     private async Task NewRound()
     {
         isResetting = true;
         await Task.Delay(300);
         MN.NewRound();
-        errorMsg    = "";
+        errorMsg = "";
         isResetting = false;
     }
 }
 
 <style>
-    /* ── MASA ─────────────────────────────────────────────────────────────── */
     .mn-table {
-        display: flex; flex-direction: row; gap: 0;
+        display: flex;
+        flex-direction: row;
+        gap: 0;
         min-height: 640px;
-        font-family: 'Rajdhani', sans-serif; color: #f0e6d3;
-        background: radial-gradient(ellipse 120% 80% at 30% 50%,
-            #0a0e1a 0%, #070a12 55%, #030509 100%);
-        border-radius: 0 0 8px 8px; overflow: hidden;
+        font-family: 'Rajdhani', sans-serif;
+        color: #f0e6d3;
+        background: radial-gradient(ellipse 120% 80% at 30% 50%, #0a0e1a 0%, #070a12 55%, #030509 100%);
+        border-radius: 0 0 8px 8px;
+        overflow: hidden;
         position: relative;
     }
-    .mn-table::before {
-        content:''; position:absolute; inset:0; pointer-events:none;
-        background-image:
-            repeating-linear-gradient( 45deg,transparent,transparent 50px,rgba(99,179,237,0.008) 50px,rgba(99,179,237,0.008) 51px),
-            repeating-linear-gradient(-45deg,transparent,transparent 50px,rgba(99,179,237,0.008) 50px,rgba(99,179,237,0.008) 51px);
-    }
 
-    /* ── SIDEBAR STANGA ───────────────────────────────────────────────────── */
+        .mn-table::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background-image: repeating-linear-gradient( 45deg,transparent,transparent 50px,rgba(99,179,237,0.008) 50px,rgba(99,179,237,0.008) 51px), repeating-linear-gradient(-45deg,transparent,transparent 50px,rgba(99,179,237,0.008) 50px,rgba(99,179,237,0.008) 51px);
+        }
+
     .mn-sidebar {
-        width: 280px; min-width: 260px; flex-shrink: 0;
-        display: flex; flex-direction: column; gap: 12px;
+        width: 280px;
+        min-width: 260px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
         padding: 24px 20px;
         background: rgba(0,0,0,0.35);
         border-right: 1px solid rgba(255,255,255,0.05);
         overflow-y: auto;
     }
 
-    .mn-bal-box { display:flex; flex-direction:column; gap:2px; margin-bottom:4px; }
-    .mn-lbl     { display:block; font-size:0.6rem; letter-spacing:3px; color:#3a4a6a; font-weight:700; text-transform:uppercase; }
-    .mn-lbl-val { color:#63b3ed; font-weight:700; }
-    .mn-bal-val { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; color:#D4AF37; letter-spacing:2px; }
-    .mn-section { display:flex; flex-direction:column; gap:7px; }
+    .mn-bal-box {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-bottom: 4px;
+    }
 
-    .mn-grid-btns { display:flex; gap:6px; }
+    .mn-lbl {
+        display: block;
+        font-size: 0.6rem;
+        letter-spacing: 3px;
+        color: #3a4a6a;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .mn-lbl-val {
+        color: #63b3ed;
+        font-weight: 700;
+    }
+
+    .mn-bal-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.5rem;
+        color: #D4AF37;
+        letter-spacing: 2px;
+    }
+
+    .mn-section {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+    }
+
+    .mn-grid-btns {
+        display: flex;
+        gap: 6px;
+    }
+
     .mn-gs-btn {
-        flex:1; height:36px; border-radius:6px;
-        font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:1px;
-        cursor:pointer; transition:all 0.15s;
-        background:rgba(255,255,255,0.04);
-        border:1px solid rgba(255,255,255,0.08);
-        color:#555;
+        flex: 1;
+        height: 36px;
+        border-radius: 6px;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1rem;
+        letter-spacing: 1px;
+        cursor: pointer;
+        transition: all 0.15s;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        color: #555;
     }
-    .mn-gs-btn:hover  { border-color:rgba(99,179,237,0.4); color:#63b3ed; background:rgba(99,179,237,0.07); }
-    .mn-gs-btn.gs-active { background:rgba(99,179,237,0.2); border-color:#63b3ed; color:#63b3ed; box-shadow:0 0 12px rgba(99,179,237,0.3); }
 
-    .mn-slider-row { display:flex; align-items:center; gap:8px; }
-    .mn-slider-min,.mn-slider-max { font-family:'Bebas Neue',sans-serif; font-size:0.85rem; color:#444; width:18px; text-align:center; }
+        .mn-gs-btn:hover {
+            border-color: rgba(99,179,237,0.4);
+            color: #63b3ed;
+            background: rgba(99,179,237,0.07);
+        }
+
+        .mn-gs-btn.gs-active {
+            background: rgba(99,179,237,0.2);
+            border-color: #63b3ed;
+            color: #63b3ed;
+            box-shadow: 0 0 12px rgba(99,179,237,0.3);
+        }
+
+    .mn-slider-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .mn-slider-min, .mn-slider-max {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.85rem;
+        color: #444;
+        width: 18px;
+        text-align: center;
+    }
+
     .mn-slider {
-        flex:1; height:6px; border-radius:3px;
-        -webkit-appearance:none; appearance:none;
+        flex: 1;
+        height: 6px;
+        border-radius: 3px;
+        -webkit-appearance: none;
+        appearance: none;
         background: linear-gradient(to right, #e74c3c 0%, #e74c3c calc(var(--val, 50%)), rgba(255,255,255,0.1) calc(var(--val, 50%)));
-        outline:none; cursor:pointer;
+        outline: none;
+        cursor: pointer;
     }
-    .mn-slider::-webkit-slider-thumb {
-        -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
-        background:#e74c3c; border:2px solid #fff; box-shadow:0 0 8px rgba(231,76,60,0.6);
-        cursor:pointer;
+
+        .mn-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #e74c3c;
+            border: 2px solid #fff;
+            box-shadow: 0 0 8px rgba(231,76,60,0.6);
+            cursor: pointer;
+        }
+
+        .mn-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e74c3c;
+            border: 2px solid #fff;
+            cursor: pointer;
+        }
+
+    .mn-mine-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.78rem;
+        color: #556;
     }
-    .mn-slider::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:#e74c3c; border:2px solid #fff; cursor:pointer; }
-    .mn-mine-info { display:flex; justify-content:space-between; font-size:0.78rem; color:#556; }
 
     .mn-bet-display {
-        display:flex; align-items:center; gap:6px;
-        min-height:36px; padding:0 10px;
-        background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.07); border-radius:6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 36px;
+        padding: 0 10px;
+        background: rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 6px;
     }
-    .mn-bet-val         { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#D4AF37; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .mn-bet-placeholder { font-size:0.75rem; color:#333; flex:1; }
-    .mn-bet-half, .mn-bet-dbl {
-        padding:3px 8px; border-radius:4px; border:none; cursor:pointer;
-        font-family:'Bebas Neue',sans-serif; font-size:0.75rem; letter-spacing:1px;
-        background:rgba(255,255,255,0.07); color:#888; transition:all 0.15s;
-    }
-    .mn-bet-half:hover    { background:rgba(255,255,255,0.12); color:#f0e6d3; }
-    .mn-bet-dbl:hover     { background:rgba(212,175,55,0.15); color:#D4AF37; }
-    .mn-bet-dbl:disabled  { opacity:0.3; cursor:not-allowed; }
 
-    .mn-chips-row { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; }
-    .mn-chip {
-        width:44px; height:44px; border-radius:50%; border:none; cursor:pointer;
-        display:flex; flex-direction:column; align-items:center; justify-content:center;
-        transition:all 0.15s; position:relative; overflow:hidden;
-        box-shadow:0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+    .mn-bet-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.1rem;
+        color: #D4AF37;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
-    .mn-chip::before { content:''; position:absolute; inset:3px; border-radius:50%; border:1.5px dashed rgba(255,255,255,0.2); }
-    .mn-chip:hover:not(.chip-off)  { transform:translateY(-3px) scale(1.08); }
-    .mn-chip.chip-off { opacity:0.25; cursor:not-allowed; }
-    .chi   { font-family:'Bebas Neue',sans-serif; font-size:0.95rem; color:white; line-height:1; }
-    .chcur { font-size:0.42rem; letter-spacing:1px; color:rgba(255,255,255,0.7); line-height:1; }
-    .mn-chip.chip-1   { background:linear-gradient(160deg,#bbb,#888); }
-    .mn-chip.chip-5   { background:linear-gradient(160deg,#e74c3c,#c0392b); }
-    .mn-chip.chip-10  { background:linear-gradient(160deg,#3498db,#2980b9); }
-    .mn-chip.chip-25  { background:linear-gradient(160deg,#27ae60,#1e8449); }
-    .mn-chip.chip-50  { background:linear-gradient(160deg,#e67e22,#d35400); }
-    .mn-chip.chip-100 { background:linear-gradient(160deg,#9b59b6,#6c3483); }
+
+    .mn-bet-placeholder {
+        font-size: 0.75rem;
+        color: #333;
+        flex: 1;
+    }
+
+    .mn-bet-half, .mn-bet-dbl {
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.75rem;
+        letter-spacing: 1px;
+        background: rgba(255,255,255,0.07);
+        color: #888;
+        transition: all 0.15s;
+    }
+
+        .mn-bet-half:hover {
+            background: rgba(255,255,255,0.12);
+            color: #f0e6d3;
+        }
+
+        .mn-bet-dbl:hover {
+            background: rgba(212,175,55,0.15);
+            color: #D4AF37;
+        }
+
+        .mn-bet-dbl:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+    .mn-chips-row {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .mn-chip {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+
+        .mn-chip::before {
+            content: '';
+            position: absolute;
+            inset: 3px;
+            border-radius: 50%;
+            border: 1.5px dashed rgba(255,255,255,0.2);
+        }
+
+        .mn-chip:hover:not(.chip-off) {
+            transform: translateY(-3px) scale(1.08);
+        }
+
+        .mn-chip.chip-off {
+            opacity: 0.25;
+            cursor: not-allowed;
+        }
+
+    .chi {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.95rem;
+        color: white;
+        line-height: 1;
+    }
+
+    .chcur {
+        font-size: 0.42rem;
+        letter-spacing: 1px;
+        color: rgba(255,255,255,0.7);
+        line-height: 1;
+    }
+
+    .mn-chip.chip-1 {
+        background: linear-gradient(160deg,#bbb,#888);
+    }
+
+    .mn-chip.chip-5 {
+        background: linear-gradient(160deg,#e74c3c,#c0392b);
+    }
+
+    .mn-chip.chip-10 {
+        background: linear-gradient(160deg,#3498db,#2980b9);
+    }
+
+    .mn-chip.chip-25 {
+        background: linear-gradient(160deg,#27ae60,#1e8449);
+    }
+
+    .mn-chip.chip-50 {
+        background: linear-gradient(160deg,#e67e22,#d35400);
+    }
+
+    .mn-chip.chip-100 {
+        background: linear-gradient(160deg,#9b59b6,#6c3483);
+    }
 
     .mn-clear-btn {
-        width:100%; padding:7px; border-radius:5px; border:1px solid rgba(231,76,60,0.2);
-        background:transparent; color:#555; font-family:'Rajdhani',sans-serif;
-        font-size:0.72rem; letter-spacing:1px; cursor:pointer; transition:all 0.15s;
+        width: 100%;
+        padding: 7px;
+        border-radius: 5px;
+        border: 1px solid rgba(231,76,60,0.2);
+        background: transparent;
+        color: #555;
+        font-family: 'Rajdhani',sans-serif;
+        font-size: 0.72rem;
+        letter-spacing: 1px;
+        cursor: pointer;
+        transition: all 0.15s;
     }
-    .mn-clear-btn:hover { border-color:rgba(231,76,60,0.5); color:#e74c3c; }
 
-    .mn-info-val { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; color:#f0e6d3; letter-spacing:1px; }
+        .mn-clear-btn:hover {
+            border-color: rgba(231,76,60,0.5);
+            color: #e74c3c;
+        }
+
+    .mn-info-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.2rem;
+        color: #f0e6d3;
+        letter-spacing: 1px;
+    }
 
     .mn-mult-box {
-        padding:12px; border-radius:8px;
-        background:rgba(0,0,0,0.3);
-        border:1px solid rgba(255,255,255,0.06);
-        display:flex; flex-direction:column; gap:3px;
-        transition:all 0.3s;
+        padding: 12px;
+        border-radius: 8px;
+        background: rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.06);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        transition: all 0.3s;
     }
-    .mn-mult-box.mult-active {
-        border-color:rgba(212,175,55,0.35);
-        background:rgba(212,175,55,0.06);
-        box-shadow:0 0 20px rgba(212,175,55,0.15);
+
+        .mn-mult-box.mult-active {
+            border-color: rgba(212,175,55,0.35);
+            background: rgba(212,175,55,0.06);
+            box-shadow: 0 0 20px rgba(212,175,55,0.15);
+        }
+
+    .mn-mult-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 2rem;
+        color: #D4AF37;
+        letter-spacing: 2px;
+        line-height: 1;
     }
-    .mn-mult-val { font-family:'Bebas Neue',sans-serif; font-size:2rem; color:#D4AF37; letter-spacing:2px; line-height:1; }
-    .mn-pot-win  { font-size:0.85rem; color:#2ecc71; font-weight:600; }
-    .mn-next-box { padding:8px 12px; border-radius:6px; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; gap:2px; }
-    .mn-next-val { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#63b3ed; letter-spacing:1px; }
 
-    .mn-error { color:#e74c3c; font-size:0.72rem; letter-spacing:0.5px; }
+    .mn-pot-win {
+        font-size: 0.85rem;
+        color: #2ecc71;
+        font-weight: 600;
+    }
 
-    .mn-actions { display:flex; flex-direction:column; gap:8px; }
+    .mn-next-box {
+        padding: 8px 12px;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.04);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .mn-next-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.1rem;
+        color: #63b3ed;
+        letter-spacing: 1px;
+    }
+
+    .mn-error {
+        color: #e74c3c;
+        font-size: 0.72rem;
+        letter-spacing: 0.5px;
+    }
+
+    .mn-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
     .mn-start, .mn-cashout, .mn-rebet {
-        width:100%; padding:14px; border:none; border-radius:8px;
-        font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:3px;
-        cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px;
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 8px;
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.1rem;
+        letter-spacing: 3px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
     }
+
     .mn-start {
-        background:linear-gradient(135deg,#e74c3c 0%,#c0392b 100%);
-        color:#fff; box-shadow:0 6px 20px rgba(231,76,60,0.35), 0 2px 0 #7b241c;
+        background: linear-gradient(135deg,#e74c3c 0%,#c0392b 100%);
+        color: #fff;
+        box-shadow: 0 6px 20px rgba(231,76,60,0.35), 0 2px 0 #7b241c;
     }
-    .mn-start:hover:not(.mn-off) { background:linear-gradient(135deg,#ff6b6b 0%,#e74c3c 100%); transform:translateY(-2px); }
+
+        .mn-start:hover:not(.mn-off) {
+            background: linear-gradient(135deg,#ff6b6b 0%,#e74c3c 100%);
+            transform: translateY(-2px);
+        }
+
     .mn-cashout {
-        background:linear-gradient(135deg,#D4AF37 0%,#b8960c 100%);
-        color:#080808; box-shadow:0 6px 20px rgba(212,175,55,0.4), 0 2px 0 #8a6900;
-        font-size:0.9rem; padding:12px;
+        background: linear-gradient(135deg,#D4AF37 0%,#b8960c 100%);
+        color: #080808;
+        box-shadow: 0 6px 20px rgba(212,175,55,0.4), 0 2px 0 #8a6900;
+        font-size: 0.9rem;
+        padding: 12px;
     }
-    .mn-cashout:hover:not(.mn-off) { background:linear-gradient(135deg,#e8c84a 0%,#D4AF37 100%); transform:translateY(-2px); }
+
+        .mn-cashout:hover:not(.mn-off) {
+            background: linear-gradient(135deg,#e8c84a 0%,#D4AF37 100%);
+            transform: translateY(-2px);
+        }
+
     .mn-rebet {
-        background:transparent; border:1px solid rgba(255,255,255,0.12);
-        color:#666; font-family:'Rajdhani',sans-serif; font-size:0.78rem; font-weight:700; letter-spacing:1px; padding:10px;
+        background: transparent;
+        border: 1px solid rgba(255,255,255,0.12);
+        color: #666;
+        font-family: 'Rajdhani',sans-serif;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        padding: 10px;
     }
-    .mn-rebet:hover { border-color:rgba(212,175,55,0.4); color:#D4AF37; }
-    .mn-off { opacity:0.3; cursor:not-allowed !important; transform:none !important; }
+
+        .mn-rebet:hover {
+            border-color: rgba(212,175,55,0.4);
+            color: #D4AF37;
+        }
+
+    .mn-off {
+        opacity: 0.3;
+        cursor: not-allowed !important;
+        transform: none !important;
+    }
 
     .mn-result-banner {
-        display:flex; flex-direction:column; align-items:center; gap:4px;
-        padding:12px; border-radius:8px; text-align:center;
-        animation:resPop 0.4s cubic-bezier(0.22,1,0.36,1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+        animation: resPop 0.4s cubic-bezier(0.22,1,0.36,1);
     }
-    @@keyframes resPop { from{transform:scale(0.7);opacity:0;}to{transform:scale(1);opacity:1;} }
-    .mn-result-banner.res-win  { background:rgba(39,174,96,0.1);  border:1px solid rgba(39,174,96,0.35); }
-    .mn-result-banner.res-lose { background:rgba(231,76,60,0.1);  border:1px solid rgba(231,76,60,0.3); }
-    .mn-res-icon { font-size:1.6rem; line-height:1; }
-    .mn-res-msg  { font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:3px; color:#f0e6d3; }
-    .mn-res-amt  { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; }
-    .res-win  .mn-res-amt { color:#2ecc71; }
-    .res-lose .mn-res-amt { color:#e74c3c; }
 
-    /* ══ ZONA JOCULUI ════════════════════════════════════════════════════════ */
-    .mn-game-area {
-        flex:1; display:flex; flex-direction:column; align-items:center;
-        justify-content:center; gap:16px;
-        padding:24px 20px 28px;
+    @@keyframes resPop {
+        from {
+            transform: scale(0.7);
+            opacity: 0;
+        }
+
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
     }
-    .mn-game-header { display:flex; flex-direction:column; align-items:center; gap:4px; }
-    .mn-game-title  { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:6px; color:#D4AF37; text-shadow:0 0 20px rgba(212,175,55,0.3); }
-    .mn-game-sub    { font-size:0.65rem; letter-spacing:3px; color:#3a4a6a; }
+
+    .mn-result-banner.res-win {
+        background: rgba(39,174,96,0.1);
+        border: 1px solid rgba(39,174,96,0.35);
+    }
+
+    .mn-result-banner.res-lose {
+        background: rgba(231,76,60,0.1);
+        border: 1px solid rgba(231,76,60,0.3);
+    }
+
+    .mn-res-icon {
+        font-size: 1.6rem;
+        line-height: 1;
+    }
+
+    .mn-res-msg {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1rem;
+        letter-spacing: 3px;
+        color: #f0e6d3;
+    }
+
+    .mn-res-amt {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.1rem;
+    }
+
+    .res-win .mn-res-amt {
+        color: #2ecc71;
+    }
+
+    .res-lose .mn-res-amt {
+        color: #e74c3c;
+    }
+
+    .mn-game-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 24px 20px 28px;
+    }
+
+    .mn-game-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .mn-game-title {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 1.6rem;
+        letter-spacing: 6px;
+        color: #D4AF37;
+        text-shadow: 0 0 20px rgba(212,175,55,0.3);
+    }
+
+    .mn-game-sub {
+        font-size: 0.65rem;
+        letter-spacing: 3px;
+        color: #3a4a6a;
+    }
 
     .mn-grid {
-        display:grid;
+        display: grid;
         grid-template-columns: repeat(var(--cols), var(--cell-size));
-        grid-template-rows:    repeat(var(--cols), var(--cell-size));
-        gap:6px;
+        grid-template-rows: repeat(var(--cols), var(--cell-size));
+        gap: 6px;
     }
 
     .mn-cell {
-        width: var(--cell-size); height: var(--cell-size);
-        border-radius: 10px; overflow: hidden; position: relative; cursor: default;
+        width: var(--cell-size);
+        height: var(--cell-size);
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+        cursor: default;
         animation: cellAppear 0.4s cubic-bezier(0.22,1,0.36,1) both;
         animation-delay: calc(var(--i) * 8ms);
     }
-    @@keyframes cellAppear { from{transform:scale(0.6);opacity:0;} to{transform:scale(1);opacity:1;} }
-    .mn-cell-inner {
-        width:100%; height:100%;
-        display:flex; flex-direction:column; align-items:center; justify-content:center;
-        gap:2px; border-radius:10px;
+
+    @@keyframes cellAppear {
+        from {
+            transform: scale(0.6);
+            opacity: 0;
+        }
+
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
     }
+
+    .mn-cell-inner {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        border-radius: 10px;
+    }
+
     .cell-hidden .mn-cell-inner {
         background: linear-gradient(145deg, #1e2744 0%, #151d36 100%);
         border: 1px solid rgba(99,179,237,0.1);
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(255,255,255,0.04);
     }
+
     .cell-idle {
         background: linear-gradient(145deg, #1e2744 0%, #151d36 100%);
         border: 1px solid rgba(99,179,237,0.1);
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(255,255,255,0.04);
     }
-    .cell-hover { cursor:pointer; }
-    .cell-hover:hover .mn-cell-inner {
-        background: linear-gradient(145deg, #2a3860 0%, #1e2e52 100%);
-        border-color: rgba(99,179,237,0.4);
-        box-shadow: 0 0 14px rgba(99,179,237,0.25), inset 0 2px 4px rgba(0,0,0,0.3);
-        transform: scale(1.04); transition: all 0.1s;
+
+    .cell-hover {
+        cursor: pointer;
     }
-    .cell-hover:active .mn-cell-inner { transform:scale(0.97); }
-    .cell-safe { animation: cellAppear 0.4s cubic-bezier(0.22,1,0.36,1) both !important; }
+
+        .cell-hover:hover .mn-cell-inner {
+            background: linear-gradient(145deg, #2a3860 0%, #1e2e52 100%);
+            border-color: rgba(99,179,237,0.4);
+            box-shadow: 0 0 14px rgba(99,179,237,0.25), inset 0 2px 4px rgba(0,0,0,0.3);
+            transform: scale(1.04);
+            transition: all 0.1s;
+        }
+
+        .cell-hover:active .mn-cell-inner {
+            transform: scale(0.97);
+        }
+
+    .cell-safe {
+        animation: cellAppear 0.4s cubic-bezier(0.22,1,0.36,1) both !important;
+    }
+
     .gem-reveal {
         background: linear-gradient(145deg, #0d2818 0%, #0a1f12 100%);
         border: 1px solid rgba(46,204,113,0.5);
         box-shadow: 0 0 16px rgba(46,204,113,0.3), inset 0 1px 0 rgba(46,204,113,0.2);
         animation: gemPop 0.35s cubic-bezier(0.22,1,0.36,1);
     }
-    @@keyframes gemPop { from{transform:scale(0.5) rotate(-15deg);opacity:0;} to{transform:scale(1) rotate(0deg);opacity:1;} }
-    .mn-gem       { font-size:1.5rem; line-height:1; filter:drop-shadow(0 0 6px rgba(46,204,113,0.8)); }
-    .mn-cell-mult { font-family:'Bebas Neue',sans-serif; font-size:0.62rem; color:rgba(46,204,113,0.8); letter-spacing:1px; line-height:1; }
+
+    @@keyframes gemPop {
+        from {
+            transform: scale(0.5) rotate(-15deg);
+            opacity: 0;
+        }
+
+        to {
+            transform: scale(1) rotate(0deg);
+            opacity: 1;
+        }
+    }
+
+    .mn-gem {
+        font-size: 1.5rem;
+        line-height: 1;
+        filter: drop-shadow(0 0 6px rgba(46,204,113,0.8));
+    }
+
+    .mn-cell-mult {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.62rem;
+        color: rgba(46,204,113,0.8);
+        letter-spacing: 1px;
+        line-height: 1;
+    }
+
     .cell-mine .mine-reveal {
         background: linear-gradient(145deg, #2a0a0a 0%, #1a0606 100%);
         border: 1px solid rgba(231,76,60,0.3);
         box-shadow: 0 0 10px rgba(231,76,60,0.2);
     }
-    .mn-bomb { font-size:1.4rem; line-height:1; opacity:0.7; }
+
+    .mn-bomb {
+        font-size: 1.4rem;
+        line-height: 1;
+        opacity: 0.7;
+    }
+
     .cell-boom .mine-boom {
         background: linear-gradient(145deg, #3a0a0a 0%, #250606 100%);
         border: 2px solid rgba(231,76,60,0.8);
         box-shadow: 0 0 30px rgba(231,76,60,0.7), 0 0 60px rgba(231,76,60,0.3);
         animation: boomFlash 0.4s ease-out;
     }
-    @@keyframes boomFlash { 0%{transform:scale(1.3);box-shadow:0 0 60px rgba(231,76,60,1);} 50%{transform:scale(0.9);} 100%{transform:scale(1);} }
-    .mn-boom { font-size:1.8rem; line-height:1; animation:boomSpin 0.4s ease-out; filter:drop-shadow(0 0 12px rgba(231,76,60,0.9)); }
-    @@keyframes boomSpin { from{transform:rotate(-20deg) scale(1.5);} to{transform:rotate(0deg) scale(1);} }
-    .cell-safe-ghost .safe-ghost { background:rgba(0,0,0,0.3); border:1px solid rgba(46,204,113,0.12); }
 
-    .mn-win-chance { display:flex; flex-direction:column; align-items:center; gap:5px; width:100%; max-width:600px; }
-    .mn-chance-bar-wrap { width:100%; height:6px; border-radius:3px; background:rgba(255,255,255,0.06); overflow:hidden; }
-    .mn-chance-bar { height:100%; border-radius:3px; transition:width 0.4s ease, background 0.4s ease; }
-    .mn-chance-val { font-family:'Bebas Neue',sans-serif; font-size:0.9rem; letter-spacing:2px; }
+    @@keyframes boomFlash {
+        0% {
+            transform: scale(1.3);
+            box-shadow: 0 0 60px rgba(231,76,60,1);
+        }
+
+        50% {
+            transform: scale(0.9);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    .mn-boom {
+        font-size: 1.8rem;
+        line-height: 1;
+        animation: boomSpin 0.4s ease-out;
+        filter: drop-shadow(0 0 12px rgba(231,76,60,0.9));
+    }
+
+    @@keyframes boomSpin {
+        from {
+            transform: rotate(-20deg) scale(1.5);
+        }
+
+        to {
+            transform: rotate(0deg) scale(1);
+        }
+    }
+
+    .cell-safe-ghost .safe-ghost {
+        background: rgba(0,0,0,0.3);
+        border: 1px solid rgba(46,204,113,0.12);
+    }
+
+    .mn-win-chance {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        width: 100%;
+        max-width: 600px;
+    }
+
+    .mn-chance-bar-wrap {
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255,255,255,0.06);
+        overflow: hidden;
+    }
+
+    .mn-chance-bar {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.4s ease, background 0.4s ease;
+    }
+
+    .mn-chance-val {
+        font-family: 'Bebas Neue',sans-serif;
+        font-size: 0.9rem;
+        letter-spacing: 2px;
+    }
 
     @@media (max-width:700px) {
-        .mn-table    { flex-direction:column; }
-        .mn-sidebar  { width:100%; min-width:unset; border-right:none; border-bottom:1px solid rgba(255,255,255,0.05); }
-        .mn-chips-row{ justify-content:flex-start; }
-        .mn-grid     { gap:4px; }
+        .mn-table {
+            flex-direction: column;
+        }
+
+        .mn-sidebar {
+            width: 100%;
+            min-width: unset;
+            border-right: none;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .mn-chips-row {
+            justify-content: flex-start;
+        }
+
+        .mn-grid {
+            gap: 4px;
+        }
     }
 </style>
