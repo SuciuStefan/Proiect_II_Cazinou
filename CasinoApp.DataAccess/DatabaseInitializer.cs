@@ -32,19 +32,15 @@ namespace CasinoApp.DataAccess
                     IsActive INTEGER NOT NULL DEFAULT 1
                 );
 
-              ;
-
                 CREATE TABLE IF NOT EXISTS Bets (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     PlayerId INTEGER NOT NULL,
                     GameId INTEGER NOT NULL,
-                    SessionId INTEGER NULL,
                     Amount REAL NOT NULL,
                     BetTime TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     Status TEXT NOT NULL DEFAULT 'Pending',
                     FOREIGN KEY (PlayerId) REFERENCES Players(Id) ON DELETE CASCADE,
-                    FOREIGN KEY (GameId) REFERENCES Games(Id) ON DELETE CASCADE,
-                    FOREIGN KEY (SessionId) REFERENCES GameSessions(Id) ON DELETE SET NULL
+                    FOREIGN KEY (GameId) REFERENCES Games(Id) ON DELETE CASCADE
                 );
 
                 CREATE TABLE IF NOT EXISTS Transactions (
@@ -57,7 +53,6 @@ namespace CasinoApp.DataAccess
                     FOREIGN KEY (PlayerId) REFERENCES Players(Id) ON DELETE CASCADE
                 );
 
-                
                 CREATE TABLE IF NOT EXISTS PasswordResetTokens (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     PlayerId INTEGER NOT NULL,
@@ -70,17 +65,65 @@ namespace CasinoApp.DataAccess
 
                 CREATE INDEX IF NOT EXISTS IX_Bets_PlayerId ON Bets(PlayerId);
                 CREATE INDEX IF NOT EXISTS IX_Bets_GameId ON Bets(GameId);
-                CREATE INDEX IF NOT EXISTS IX_Bets_SessionId ON Bets(SessionId);
 
                 CREATE INDEX IF NOT EXISTS IX_Transactions_PlayerId ON Transactions(PlayerId);
-
-                
             ";
 
             command.ExecuteNonQuery();
 
+            NormalizeBetsTable(connection);
             SeedGames(connection);
             Console.WriteLine("Database initialized successfully.");
+        }
+
+        private static void NormalizeBetsTable(SqliteConnection connection)
+        {
+            using var inspect = connection.CreateCommand();
+            inspect.CommandText = @"
+                SELECT sql
+                FROM sqlite_master
+                WHERE type = 'table' AND name = 'Bets';
+            ";
+
+            var sql = inspect.ExecuteScalar()?.ToString() ?? string.Empty;
+
+            if (!sql.Contains("GameSessions", StringComparison.OrdinalIgnoreCase) &&
+                !sql.Contains("SessionId", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            using var migrate = connection.CreateCommand();
+            migrate.CommandText = @"
+                PRAGMA foreign_keys = OFF;
+
+                DROP INDEX IF EXISTS IX_Bets_SessionId;
+
+                CREATE TABLE IF NOT EXISTS Bets_New (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    PlayerId INTEGER NOT NULL,
+                    GameId INTEGER NOT NULL,
+                    Amount REAL NOT NULL,
+                    BetTime TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    Status TEXT NOT NULL DEFAULT 'Pending',
+                    FOREIGN KEY (PlayerId) REFERENCES Players(Id) ON DELETE CASCADE,
+                    FOREIGN KEY (GameId) REFERENCES Games(Id) ON DELETE CASCADE
+                );
+
+                INSERT OR IGNORE INTO Bets_New (Id, PlayerId, GameId, Amount, BetTime, Status)
+                SELECT Id, PlayerId, GameId, Amount, BetTime, Status
+                FROM Bets;
+
+                DROP TABLE Bets;
+                ALTER TABLE Bets_New RENAME TO Bets;
+
+                CREATE INDEX IF NOT EXISTS IX_Bets_PlayerId ON Bets(PlayerId);
+                CREATE INDEX IF NOT EXISTS IX_Bets_GameId ON Bets(GameId);
+
+                PRAGMA foreign_keys = ON;
+            ";
+
+            migrate.ExecuteNonQuery();
         }
 
         private static void SeedGames(SqliteConnection connection)

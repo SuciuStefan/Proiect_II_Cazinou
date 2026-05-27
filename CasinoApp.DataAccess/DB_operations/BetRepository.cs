@@ -13,7 +13,7 @@ namespace CasinoApp.DataAccess.DB_operations
 
             var command = connection.CreateCommand();
             command.CommandText = @"
-                SELECT Id, PlayerId, GameId, SessionId, Amount, BetTime, Status
+                SELECT Id, PlayerId, GameId, Amount, BetTime, Status
                 FROM Bets;
             ";
 
@@ -26,10 +26,9 @@ namespace CasinoApp.DataAccess.DB_operations
                     Id = reader.GetInt32(0),
                     PlayerId = reader.GetInt32(1),
                     GameId = reader.GetInt32(2),
-                    SessionId = reader.IsDBNull(3) ? null : reader.GetInt32(3),
-                    Amount = reader.GetDouble(4),
-                    BetTime = reader.GetString(5),
-                    Status = reader.GetString(6)
+                    Amount = reader.GetDouble(3),
+                    BetTime = reader.GetString(4),
+                    Status = reader.GetString(5)
                 });
             }
 
@@ -43,7 +42,7 @@ namespace CasinoApp.DataAccess.DB_operations
 
             var command = connection.CreateCommand();
             command.CommandText = @"
-                SELECT Id, PlayerId, GameId, SessionId, Amount, BetTime, Status
+                SELECT Id, PlayerId, GameId, Amount, BetTime, Status
                 FROM Bets
                 WHERE Id = $id;
             ";
@@ -59,10 +58,9 @@ namespace CasinoApp.DataAccess.DB_operations
                 Id = reader.GetInt32(0),
                 PlayerId = reader.GetInt32(1),
                 GameId = reader.GetInt32(2),
-                SessionId = reader.IsDBNull(3) ? null : reader.GetInt32(3),
-                Amount = reader.GetDouble(4),
-                BetTime = reader.GetString(5),
-                Status = reader.GetString(6)
+                Amount = reader.GetDouble(3),
+                BetTime = reader.GetString(4),
+                Status = reader.GetString(5)
             };
         }
 
@@ -75,7 +73,7 @@ namespace CasinoApp.DataAccess.DB_operations
 
             var command = connection.CreateCommand();
             command.CommandText = @"
-                SELECT Id, PlayerId, GameId, SessionId, Amount, BetTime, Status
+                SELECT Id, PlayerId, GameId, Amount, BetTime, Status
                 FROM Bets
                 WHERE PlayerId = $playerId
                 ORDER BY BetTime DESC;
@@ -91,45 +89,9 @@ namespace CasinoApp.DataAccess.DB_operations
                     Id = reader.GetInt32(0),
                     PlayerId = reader.GetInt32(1),
                     GameId = reader.GetInt32(2),
-                    SessionId = reader.IsDBNull(3) ? null : reader.GetInt32(3),
-                    Amount = reader.GetDouble(4),
-                    BetTime = reader.GetString(5),
-                    Status = reader.GetString(6)
-                });
-            }
-
-            return bets;
-        }
-
-        public List<Bet> GetBySessionId(int sessionId)
-        {
-            var bets = new List<Bet>();
-
-            using var connection = DbManager.GetConnection();
-            connection.Open();
-
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                SELECT Id, PlayerId, GameId, SessionId, Amount, BetTime, Status
-                FROM Bets
-                WHERE SessionId = $sessionId
-                ORDER BY BetTime DESC;
-            ";
-            command.Parameters.AddWithValue("$sessionId", sessionId);
-
-            using var reader = command.ExecuteReader();
-
-            while (reader.Read())
-            {
-                bets.Add(new Bet
-                {
-                    Id = reader.GetInt32(0),
-                    PlayerId = reader.GetInt32(1),
-                    GameId = reader.GetInt32(2),
-                    SessionId = reader.IsDBNull(3) ? null : reader.GetInt32(3),
-                    Amount = reader.GetDouble(4),
-                    BetTime = reader.GetString(5),
-                    Status = reader.GetString(6)
+                    Amount = reader.GetDouble(3),
+                    BetTime = reader.GetString(4),
+                    Status = reader.GetString(5)
                 });
             }
 
@@ -143,15 +105,14 @@ namespace CasinoApp.DataAccess.DB_operations
 
             var command = connection.CreateCommand();
             command.CommandText = @"
-        INSERT INTO Bets (PlayerId, GameId, SessionId, Amount, Status)
-        VALUES ($playerId, $gameId, $sessionId, $amount, $status);
+        INSERT INTO Bets (PlayerId, GameId, Amount, Status)
+        VALUES ($playerId, $gameId, $amount, $status);
 
         SELECT last_insert_rowid();
     ";
 
             command.Parameters.AddWithValue("$playerId", bet.PlayerId);
             command.Parameters.AddWithValue("$gameId", bet.GameId);
-            command.Parameters.AddWithValue("$sessionId", (object?)bet.SessionId ?? DBNull.Value);
             command.Parameters.AddWithValue("$amount", bet.Amount);
             command.Parameters.AddWithValue("$status", bet.Status);
 
